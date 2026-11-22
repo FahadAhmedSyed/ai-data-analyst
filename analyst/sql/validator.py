@@ -452,7 +452,9 @@ class SqlValidator:
             finding = _reject("parse_error", "The query could not be checked.")
             safe_sql = None
         if finding is None:
-            return ValidationResult(status="ok", category="ok", safe_sql=safe_sql)
+            return ValidationResult(
+                status="ok", category="ok", safe_sql=safe_sql, max_rows=self._max_rows
+            )
         if finding.status == "rejected":
             log.warning(
                 "sql_rejected",
