@@ -11,6 +11,7 @@ from analyst.core.errors import (
     RateLimitedError,
     SessionCorruptedError,
 )
+from analyst.core.models import Usage
 
 CASES = [
     (
@@ -78,3 +79,10 @@ def test_errors_can_be_raised_and_caught_as_base():
     with pytest.raises(AnalystError) as info:
         raise LLMError("rate_limited", "429")
     assert info.value.category == "rate_limited"
+
+
+def test_llm_error_carries_the_usage_of_a_billed_call():
+    usage = Usage(llm_calls=1, input_tokens=10, output_tokens=5, cost_usd=0.01)
+    assert LLMError("invalid_output", "refusal", usage=usage).usage == usage
+    assert LLMError("timeout").usage is None
+    assert "tokens" not in str(LLMError("invalid_output", "refusal", usage=usage))
