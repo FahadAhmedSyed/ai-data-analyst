@@ -73,19 +73,24 @@ Nothing user-specific is stored in module globals, `st.cache_data` or `st.cache_
 
 ## 4. Data contracts
 
-All stages exchange Pydantic models defined in `analyst/core/models.py`. Field lists are indicative; T1.02 finalises them.
+All stages exchange Pydantic models defined in `analyst/core/models.py`. Models sent to OpenAI as structured-output schemas (marked LLM) are kept compatible with OpenAI's strict JSON schema mode, which a unit test enforces.
 
-| Model | Key fields |
-| --- | --- |
-| `ColumnInfo` | `sql_name`, `display_name`, `dtype`, `null_count`, `distinct_count`, `min`, `max`, `top_values`, `flags` (ambiguous_date, censored, mixed_type) |
-| `DatasetProfile` | `table_name`, `source_file`, `sheet`, `row_count`, `column_count`, `columns`, `duplicate_rows`, `date_range`, `latest_date` |
-| `Intent` | `operation`, `measures`, `dimensions`, `filters`, `time_range`, `sort`, `limit`, `output` |
-| `GenerationResult` | `resolved_question`, `intent`, `assumptions`, `ambiguities`, `needs_clarification`, `clarification_question`, `sql`, `explanation`, `chart` |
-| `ValidationResult` | `ok`, `category` (ok, reject, correctable), `reason`, `safe_sql` |
-| `QueryResult` | `dataframe`, `row_count`, `truncated`, `duration_ms`, `error_category`, `error_message` |
-| `Explanation` | `answer_markdown`, `key_numbers`, `caveats`, `grounded`, `fallback_used` |
-| `Turn` | `question`, `resolved_question`, `intent`, `sql`, `assumptions`, `answer`, `result_summary` |
-| `AnalystResponse` | `status` (answered, clarification, failed), `turn`, `result`, `chart`, `messages`, `usage` (calls, tokens, cost, latency) |
+| Model | Kind | Key fields |
+| --- | --- | --- |
+| `ColumnSchema` | Internal | `sql_name`, `display_name`, `dtype`, `flags` (ambiguous_date, censored_values, mixed_types, numeric_text, all_missing, constant) |
+| `ColumnProfile` | Internal | `ColumnSchema` plus `null_count`, `distinct_count`, `min_value`, `max_value`, `mean`, `std`, quartiles, `top_values`, `date_min`, `date_max` |
+| `DatasetProfile` | Internal | `table_name`, `source_name`, `sheet_name`, `row_count`, `column_count`, `columns`, `duplicate_rows`, `primary_date_column`, `latest_date` |
+| `Intent` | LLM | `operation`, `measures`, `dimensions`, `filters`, `time_range`, `sort`, `limit`, `output` |
+| `GenerationResult` | LLM | `resolved_question`, `intent`, `assumptions`, `ambiguities`, `needs_clarification`, `clarification_question`, `sql`, `explanation`, `chart` |
+| `ModelExplanation` | LLM | `answer_markdown`, `key_numbers` (value, column, label), `caveats` |
+| `ValidationResult` | Internal | `status` (ok, correctable, rejected), `category`, `reason`, `safe_sql` |
+| `QueryResult` | Internal | `dataframe`, `row_count`, `truncated`, `duration_ms`; successful queries only |
+| `ResultSummary` | Internal | `columns`, `row_count`, `truncated`, up to 20 preview rows |
+| `Turn` | Internal | `question`, `status`, `resolved_question`, `intent`, `sql`, `assumptions`, `answer_text`, `result_summary` |
+| `Usage` | Internal | `llm_calls`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms` |
+| `AnalystResponse` | Internal | `status` (answered, clarification, failed), `message`, `resolved_question`, `assumptions`, `caveats`, `sql`, `result`, `chart`, `grounded`, `fallback_used`, `usage`, `turn` |
+
+Failures are raised as typed errors from `analyst/core/errors.py`, each with a `category` for logs and a `user_message` safe to show: `IngestionError`, `QueryExecutionError`, `LLMError`, `BudgetExceededError`, `RateLimitedError`, `SessionCorruptedError`. The orchestrator turns them into a `failed` response.
 
 ## 5. Dataset loading flow
 

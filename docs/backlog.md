@@ -21,7 +21,7 @@
 | ID | Task | Size | Depends on | Milestone | Status |
 | --- | --- | --- | --- | --- | --- |
 | T1.01 | Project scaffold, settings, logging, CI | S | Repository created | M1 | In review |
-| T1.02 | Core models and error types | S | T1.01 | M1 | Ready |
+| T1.02 | Core models and error types | S | T1.01 | M1 | In review |
 | T1.03 | CSV loader | M | T1.02 | M1 | Ready |
 | T1.04 | Excel loader | M | T1.02 | M1 | Ready |
 | T1.05 | Type inference and column mapping | M | T1.03 | M1 | Ready |

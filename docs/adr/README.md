@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-All accepted on 2026-11-22 when the development plan was approved.
+0001 to 0017 were accepted on 2026-11-22 when the development plan was approved.
 
 | ADR | Decision | Plan ref |
 | --- | --- | --- |
@@ -21,5 +21,6 @@ All accepted on 2026-11-22 when the development plan was approved.
 | [0015](0015-tooling.md) | uv, ruff, pytest, GitHub Actions | D10 |
 | [0016](0016-repository-and-workflow.md) | New repository, branches and reviewed pull requests | D11 |
 | [0017](0017-grounded-numbers.md) | Every number in an answer is grounded in results | Pipeline |
+| [0018](0018-standing-push-approval.md) | Finished task branches are pushed and opened as PRs without asking; merging stays with Fahad (amends 0016) | 2026-11-22 |
 
 Format: context, decision, alternatives considered, consequences. A changed decision gets a new ADR that supersedes the old one; accepted ADRs are not edited in place.
