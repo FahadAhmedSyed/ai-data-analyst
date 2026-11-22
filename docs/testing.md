@@ -39,7 +39,7 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Context builder | Snapshots of the system prompt and of the user message in full and schema-only mode (`tests/unit/snapshots/`, rewritten with `UPDATE_SNAPSHOTS=1`); canary values prove schema-only mode sends no cell value; file text cannot forge a marker line; at most three sample rows, three turns and one result preview; every construct the prompt recommends passes the validator; the function list equals the allowlist | Fixtures and the synthetic sales table |
 | Generator | Each structured output shape; intent column check; clarification gate | Fake LLM |
 | Corrector | Each category; budget exhaustion; Reject never retried | Fake LLM |
-| Grounding | Number formats (1,234.5; 12%; -3.2; 1e3); rounding; numbers from the question and assumptions allowed; invented number caught | Inline |
+| Grounding | Number formats (1,234.5; 12%; -3.2; 1e3; 1.2 million); identifiers, ordinals and list numbering ignored; rounding half-unit boundaries; percent against fractions; numbers from the question, assumptions, dates, text values and column names allowed; invented and derived numbers caught; key numbers checked against their column; result caveats, empty-result and template answers | Inline, with expected values written by hand |
 | Charts | Result shape matrix to chart type | Inline |
 | Memory | Window of 3; reset; replace; carried assumptions | Inline |
 | Orchestrator | Every path in the question flow diagram, including API failure | Fake LLM |
