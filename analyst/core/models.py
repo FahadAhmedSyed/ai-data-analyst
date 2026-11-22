@@ -67,6 +67,16 @@ ResponseStatus = Literal["answered", "clarification", "failed"]
 
 ValidationStatus = Literal["ok", "correctable", "rejected"]
 
+QualityKind = Literal[
+    "duplicate_rows",
+    "all_missing",
+    "mixed_types",
+    "censored_values",
+    "ambiguous_date",
+    "missing_values",
+    "constant",
+]
+
 ValidationCategory = Literal[
     "ok",
     "parse_error",
@@ -133,6 +143,15 @@ class ColumnProfile(ColumnSchema):
     def null_fraction(self, row_count: int) -> float:
         """Share of missing values, between 0 and 1."""
         return self.null_count / row_count if row_count else 0.0
+
+
+class QualityIssue(_Internal):
+    """One finding in the data quality summary. The message never contains cell values."""
+
+    kind: QualityKind
+    column: str | None = Field(default=None, description="SQL name; None for whole-table findings")
+    count: NonNegativeInt = Field(default=0, description="Rows or values affected, where counted")
+    message: str
 
 
 class DatasetProfile(_Internal):

@@ -105,7 +105,8 @@ def default_table_name(source_name: str) -> str:
     return to_identifier(PurePath(source_name).stem)
 
 
-def _quote(identifier: str) -> str:
+def quote_identifier(identifier: str) -> str:
+    """Double-quote a SQL identifier (names already come from ``to_identifier``)."""
     return '"' + identifier.replace('"', '""') + '"'
 
 
@@ -160,6 +161,8 @@ class SessionDatabase:
         self._clock = clock
         self._con: duckdb.DuckDBPyConnection | None = None
         self._table_name: str | None = None
+        self._source_name = ""
+        self._sheet_name: str | None = None
         self._columns: tuple[ColumnSchema, ...] = ()
         self._snapshot: CatalogSnapshot | None = None
         self._content_checked = False
@@ -186,6 +189,18 @@ class SessionDatabase:
         self._require_open()
         assert self._table_name is not None  # noqa: S101 - set together with the connection
         return self._table_name
+
+    @property
+    def source_name(self) -> str:
+        """Name of the uploaded file the table came from."""
+        self._require_open()
+        return self._source_name
+
+    @property
+    def sheet_name(self) -> str | None:
+        """Worksheet the table came from, for Excel files."""
+        self._require_open()
+        return self._sheet_name
 
     @property
     def columns(self) -> tuple[ColumnSchema, ...]:
@@ -267,6 +282,7 @@ class SessionDatabase:
                 con.close()
                 raise
             self._con, self._table_name, self._columns = con, name, table.columns
+            self._source_name, self._sheet_name = table.source_name, table.sheet_name
             self._snapshot, self._corrupted = snapshot, False
             self._content_checked = snapshot.fingerprint is not None
             self.touch()
@@ -285,13 +301,14 @@ class SessionDatabase:
     @staticmethod
     def _create_table(con: duckdb.DuckDBPyConnection, table: TypedTable, name: str) -> None:
         select_list = ", ".join(
-            f"CAST({_quote(c.sql_name)} AS {_SQL_TYPES[c.dtype]}) AS {_quote(c.sql_name)}"
+            f"CAST({q} AS {_SQL_TYPES[c.dtype]}) AS {q}"
             for c in table.columns
+            for q in (quote_identifier(c.sql_name),)
         )
         con.register(_INPUT_VIEW, table.dataframe)
         try:
             con.execute(
-                f"CREATE TABLE {_quote(name)} AS SELECT {select_list} FROM {_INPUT_VIEW}"  # noqa: S608
+                f"CREATE TABLE {quote_identifier(name)} AS SELECT {select_list} FROM {_INPUT_VIEW}"  # noqa: S608
             )
         finally:
             con.unregister(_INPUT_VIEW)
@@ -329,7 +346,7 @@ class SessionDatabase:
     def _count_rows(con: duckdb.DuckDBPyConnection, name: str) -> int:
         """Rows in the table, or -1 if it no longer exists."""
         try:
-            row = con.execute(f"SELECT count(*) FROM {_quote(name)}").fetchone()  # noqa: S608
+            row = con.execute(f"SELECT count(*) FROM {quote_identifier(name)}").fetchone()  # noqa: S608
         except duckdb.Error:
             return -1
         return int(row[0]) if row else -1
@@ -349,7 +366,7 @@ class SessionDatabase:
             # ``name`` is validated in ``load`` and quoted here.
             query = (
                 "SELECT COALESCE(SUM(CAST(hash(__row) AS HUGEINT)), 0) "  # noqa: S608
-                f"FROM {_quote(name)} AS __row"
+                f"FROM {quote_identifier(name)} AS __row"
             )
             hashed = con.execute(query).fetchone()
             fingerprint = int(hashed[0]) if hashed else None
@@ -389,6 +406,13 @@ class SessionDatabase:
             self.touch()
             return con.execute(sql, list(params) if params is not None else None).df()
 
+    def query_rows(self, sql: str, params: Sequence[Any] | None = None) -> list[tuple[Any, ...]]:
+        """Run application-written SQL and return Python values (dates stay ``date``)."""
+        with self.lock:
+            con = self.connection
+            self.touch()
+            return con.execute(sql, list(params) if params is not None else None).fetchall()
+
     def interrupt(self) -> None:
         """Stop a running query. Safe to call from another thread, and does not take the lock."""
         con = self._con
@@ -416,6 +440,7 @@ class SessionDatabase:
                 self._con.close()
             self._con = None
             self._table_name = None
+            self._source_name, self._sheet_name = "", None
             self._columns = ()
             self._snapshot = None
             self._content_checked = False

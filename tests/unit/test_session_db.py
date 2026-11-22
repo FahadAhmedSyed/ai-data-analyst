@@ -10,6 +10,7 @@ import io
 import json
 import threading
 import time
+from datetime import date, datetime
 
 import duckdb
 import pandas as pd
@@ -549,6 +550,36 @@ def test_the_context_manager_closes_the_database():
     with SessionDatabase(settings()) as database:
         database.load(typed_table())
     assert not database.is_loaded
+
+
+def test_source_and_sheet_names_come_from_the_loaded_table():
+    table = typed_table("Rainfall 2024.xlsx")
+    named = TypedTable(table.dataframe, table.columns, table.source_name, "Daily")
+    with SessionDatabase(settings()) as database:
+        database.load(named)
+        assert (database.source_name, database.sheet_name) == ("Rainfall 2024.xlsx", "Daily")
+        database.load(other_table())
+        assert (database.source_name, database.sheet_name) == ("cities.csv", None)
+        database.close()
+        with pytest.raises(RuntimeError, match="No dataset"):
+            _ = database.source_name
+
+
+def test_query_rows_returns_python_values_with_dates_as_dates(db):
+    rows = db.query_rows(
+        "SELECT order_id, order_date, sent_at, revenue FROM retail_sales ORDER BY order_id"
+    )
+    assert rows == [
+        (1, date(2024, 1, 13), datetime(2024, 1, 13, 10, 30), 1200.5),
+        (2, date(2024, 2, 2), datetime(2024, 1, 14, 11, 0), 3.0),
+        (3, None, None, None),
+    ]
+    assert db.query_rows("SELECT region FROM retail_sales WHERE order_id = ?", [3]) == [("South",)]
+
+
+def test_quote_identifier_doubles_embedded_quotes():
+    assert session_db.quote_identifier("plain") == '"plain"'
+    assert session_db.quote_identifier('we"ird') == '"we""ird"'
 
 
 def test_query_df_passes_parameters(db):
