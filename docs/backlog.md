@@ -37,11 +37,11 @@
 | T1.09 | Query executor | M | T1.08 | M2 | Done |
 | T1.10 | LLM client and fake | M | T1.02 | M3 | Done |
 | T1.11 | Prompts, region rules, context builder | M | T1.07 | M3 | Done |
-| T1.12 | Intent and SQL generator | M | T1.10, T1.11, spike (c) | M3 | In review (built on the fake; real-model quality check needs the key) |
+| T1.12 | Intent and SQL generator | M | T1.10, T1.11, spike (c) | M3 | Done (built on the fake; real-model quality check needs the key) |
 | T1.13 | Corrector and retry loop | M | T1.09, T1.12 | M3 | In review |
-| T1.14 | Explainer and grounding check | M | T1.09, T1.10 | M3 | In review (part 1, grounding and result notes, is merged; part 2 is the explainer) |
-| T1.15 | Chart recommender and builder | M | T1.02 | M4 | Ready |
-| T1.16 | Conversation memory | S | T1.02 | M3 | In review |
+| T1.14 | Explainer and grounding check | M | T1.09, T1.10 | M3 | Done |
+| T1.15 | Chart recommender and builder | M | T1.02 | M4 | Done |
+| T1.16 | Conversation memory | S | T1.02 | M3 | Done |
 | T1.17 | Orchestrator | M | T1.12 to T1.16 | M3 | Waiting |
 | T1.18 | Streamlit UI | L | T1.04, T1.07, T1.17 | M4 | Waiting |
 | T1.19 | Benchmark harness and datasets | M | T0.5, T1.17 | M4 | Waiting |
