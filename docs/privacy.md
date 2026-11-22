@@ -33,7 +33,7 @@ Nothing is written to disk by the app. A Railway restart deletes all sessions.
 | Three sample rows | Sent | Not sent |
 | The question and the last three turns (questions, intents, SQL) | Sent | Sent |
 | The first five rows of the most recent result, so follow-up questions can refer to it | Sent | Not sent (only its column names and row count) |
-| Query results for explanation (up to 50 rows, or 20 rows plus summary statistics) | Sent | Sent (needed to explain the answer) |
+| Query results for explanation (up to 50 rows, or 20 rows plus summary statistics; first 30 columns) | Sent | Sent (needed to explain the answer) |
 
 All cell text is cut to 80 characters.
 

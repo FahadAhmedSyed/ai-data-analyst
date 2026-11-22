@@ -1,0 +1,39 @@
+<<<QUESTION a1b2c3d4e5f6>>>
+Total revenue by region?
+<<<END QUESTION a1b2c3d4e5f6>>>
+
+<<<ANALYSIS a1b2c3d4e5f6>>>
+Intent: {"operation":"aggregate","measures":[{"column":"revenue","aggregation":"sum"}],"dimensions":["region"],"filters":[],"sort":[],"output":"table"}
+Assumption: Revenue means the revenue column.
+SQL: SELECT region, SUM(revenue) AS total_revenue FROM sales GROUP BY 1
+<<<END ANALYSIS a1b2c3d4e5f6>>>
+
+<<<RESULT a1b2c3d4e5f6>>>
+Rows returned: 80. Only the first 20 are shown below; the statistics further down cover all 80 rows.
+Columns: region, total_revenue, order_date.
+Rows, one JSON object per line:
+{"region": "North", "total_revenue": 1.0, "order_date": "2024-01-01"}
+{"region": "South", "total_revenue": 2.0, "order_date": "2024-01-02"}
+{"region": "East", "total_revenue": 3.0, "order_date": "2024-01-03"}
+{"region": "West", "total_revenue": 4.0, "order_date": "2024-01-04"}
+{"region": "North", "total_revenue": 5.0, "order_date": "2024-01-05"}
+{"region": "South", "total_revenue": 6.0, "order_date": "2024-01-06"}
+{"region": "East", "total_revenue": 7.0, "order_date": "2024-01-07"}
+{"region": "West", "total_revenue": 8.0, "order_date": "2024-01-08"}
+{"region": "North", "total_revenue": 9.0, "order_date": "2024-01-09"}
+{"region": "South", "total_revenue": 10.0, "order_date": "2024-01-10"}
+{"region": "East", "total_revenue": 11.0, "order_date": "2024-01-11"}
+{"region": "West", "total_revenue": 12.0, "order_date": "2024-01-12"}
+{"region": "North", "total_revenue": 13.0, "order_date": "2024-01-13"}
+{"region": "South", "total_revenue": 14.0, "order_date": "2024-01-14"}
+{"region": "East", "total_revenue": 15.0, "order_date": "2024-01-15"}
+{"region": "West", "total_revenue": 16.0, "order_date": "2024-01-16"}
+{"region": "North", "total_revenue": 17.0, "order_date": "2024-01-17"}
+{"region": "South", "total_revenue": 18.0, "order_date": "2024-01-18"}
+{"region": "East", "total_revenue": 19.0, "order_date": "2024-01-19"}
+{"region": "West", "total_revenue": 20.0, "order_date": "2024-01-20"}
+Statistics computed by software over all returned rows:
+- region (text): 80 values, 0 missing; 4 distinct; most common: 'North' 20, 'South' 20, 'East' 20
+- total_revenue (number): 80 values, 0 missing; min 1; max 80; mean 40.50; median 40.50; sum 3,240
+- order_date (date): 80 values, 0 missing; earliest 2024-01-01; latest 2024-03-20
+<<<END RESULT a1b2c3d4e5f6>>>
