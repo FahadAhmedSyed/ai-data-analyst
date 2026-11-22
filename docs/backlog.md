@@ -36,7 +36,7 @@
 | T1.12 | Intent and SQL generator | M | T1.10, T1.11, spike (c) | M3 | Blocked on OpenAI key |
 | T1.13 | Corrector and retry loop | M | T1.09, T1.12 | M3 | Waiting |
 | T1.14 | Explainer and grounding check | M | T1.09, T1.10 | M3 | Ready |
-| T1.15 | Chart recommender and builder | M | T1.02 | M4 | Ready |
+| T1.15 | Chart recommender and builder | M | T1.02 | M4 | In review |
 | T1.16 | Conversation memory | S | T1.02 | M3 | Ready |
 | T1.17 | Orchestrator | M | T1.12 to T1.16 | M3 | Waiting |
 | T1.18 | Streamlit UI | L | T1.04, T1.07, T1.17 | M4 | Waiting |

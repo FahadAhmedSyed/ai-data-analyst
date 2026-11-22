@@ -40,7 +40,7 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Generator | Each structured output shape; intent column check; clarification gate | Fake LLM |
 | Corrector | Each category; budget exhaustion; Reject never retried | Fake LLM |
 | Grounding | Number formats (1,234.5; 12%; -3.2; 1e3); rounding; numbers from the question and assumptions allowed; invented number caught | Inline |
-| Charts | Result shape matrix to chart type | Inline |
+| Charts | Result shape matrix to chart type; model suggestion used, refused or `none`; every refusal reason; slot order, legend, end label, value label, panel and gap rules at their boundaries; markup in labels escaped; dark mode and texture; theme contrast | Inline |
 | Memory | Window of 3; reset; replace; carried assumptions | Inline |
 | Orchestrator | Every path in the question flow diagram, including API failure | Fake LLM |
 | UI | Password gate; upload then ask; clarification; failure message; reset; replace; rate limit; two-session isolation; HTML in data is not rendered | AppTest |

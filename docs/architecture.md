@@ -174,15 +174,34 @@ The explainer receives question, intent, SQL, assumptions and result (all rows i
 
 ## 9. Charts
 
+Code: `analyst/visualization/` (`recommender.py` chooses, `charts.py` draws, `theme.py` holds the colours).
+
 | Result shape | Chart |
 | --- | --- |
-| Date or timestamp column plus one or more numeric columns | Line |
-| One text column (30 or fewer values) plus numeric columns | Bar |
-| Two numeric columns, no grouping | Scatter |
-| One numeric column of raw values | Histogram |
+| One date or timestamp column plus one or more numeric columns | Line, one line per numeric column |
+| One date, one text column (8 or fewer values), one numeric column | Line, one line per text value |
+| One text column (30 or fewer values) plus one or more numeric columns | Bar |
+| Two numeric columns, no grouping (3 rows or more) | Scatter |
+| One numeric column of raw values (10 rows or more) | Histogram |
 | Anything else, or a single value | Table only |
 
-The model's chart suggestion is used only when its columns exist and fit the type.
+The model's chart suggestion (`GenerationResult.chart`) is used only when every column it names exists and suits the chart type. Otherwise the rules above decide. A suggestion of `none` is respected: the model knows whether the user asked for a listing.
+
+**A chart is refused rather than bent to fit.** `fit_problem` returns the reason, which names columns and counts but never values from the data. A chart is refused when several rows share one x position or one category (they would stack on one spot), when a bar chart would have more than 30 bars, when there are more than 8 groups (3 for a scatter plot), when every group has only one point, or when the value columns are not numeric. The result is always shown as a table as well, so a missing chart loses nothing.
+
+**Drawing rules** (from the data-visualisation method used for this project; each one has a test):
+
+| Rule | Detail |
+| --- | --- |
+| One axis | Value columns whose median sizes differ by more than 10 times get one panel each, stacked and sharing the x axis. There is never a second y axis. |
+| Colour by slot | Series take the eight palette slots in fixed order and never cycle. Groups are ordered by name, so the same set of groups gets the same colours. A ninth group is not drawn. Colours follow the sorted position within one chart, so a group can change colour between two different questions. |
+| Quiet marks | Lines 2px with 8px dots (only the last point once there are more than 12), bars rounded at the end and about 24px thick, a 2px surface-coloured gap between touching marks, hairline grid. |
+| Legend and labels | A legend whenever there are two or more series, none for one. With 2 to 4 lines the line ends are also labelled, unless a name is over 24 characters or two ends would sit within 10% of the range of each other. Values are written on bars only for a single series of 12 bars or fewer. |
+| Text stays text | Text colour never takes a series colour. |
+| Modes | Light and dark colour sets, each checked with the palette validator against its own surface (colour-blind distance 9.1 light and 8.4 dark between neighbouring slots, normal-vision distance 19.6 and 19.3). Three light slots (aqua, yellow, magenta) are under 3:1 contrast on the surface, so any chart with more than one series carries a legend and hover labels. |
+| Texture | Opt-in 45 and 135 degree hatching for bars and histograms (print, colour-blind readers). |
+
+**Text from the file never becomes markup.** Plotly reads a small subset of HTML in labels, including links. Every column name, category and group name is flattened to one line, cut to 60 characters, has `&`, `<` and `>` escaped, and has `%{` broken up (Plotly treats it as a hover placeholder). A headless Chromium run with a column named `<img src=x onerror=alert(1)>` showed it as plain text and ran no script.
 
 ## 10. Configuration
 

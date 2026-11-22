@@ -43,6 +43,7 @@
 | T10 | Logs carry metadata only; SQL text behind a debug flag | Logging | Log assertion tests |
 | T11 | Key from environment only; `.env` git-ignored; `.env.example` has names only; secret scanning in CI | Repository | CI |
 | T12 | Markdown rendered with HTML disabled (Streamlit default); no `unsafe_allow_html` anywhere | UI | UI test with HTML in data |
+| T12 | Column names, categories and group names in charts are cut, flattened and escaped (`&`, `<`, `>`, `%{`) before they reach Plotly | Charts | Chart tests with HTML in names; headless browser check |
 
 ## 4. SQL validator rules
 
