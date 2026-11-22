@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-The MVP is one Python 3.12 process. A thin Streamlit UI calls one function, `ask(question, session)`, which runs a fixed pipeline and returns everything the UI shows. Only the executor runs SQL, and only the LLM client talks to OpenAI. The pipeline never imports Streamlit (ADR 0001).
+The MVP is one Python 3.12 process. A thin Streamlit UI keeps one `AnalystSession` per browser session and calls `session.ask(question)`, which applies the rate limit and runs the pipeline's `Analyst.ask`, a fixed pipeline that returns everything the UI shows. Only the executor runs SQL, and only the LLM client talks to OpenAI. Nothing outside `analyst/ui/` and `app.py` imports Streamlit (ADR 0001); a test enforces it.
 
 ```mermaid
 flowchart TB
@@ -38,7 +38,8 @@ flowchart TB
 
 | Component | Module | Responsibility | Depends on |
 | --- | --- | --- | --- |
-| UI | `app.py`, `analyst/ui/` | Password gate, upload and overrides, preview, profile and quality tabs, chat, status, results, SQL inspector, CSV download, reset and replace, privacy notice, rate limit | Orchestrator, session store |
+| UI | `app.py`, `analyst/ui/` | Draws the page and passes on what the user did: password gate, upload and read options, preview, profile and quality tabs, chat, progress line, results, SQL inspector, CSV download, new conversation and replace, privacy notice and schema-only switch. No state of its own, no SQL, no model calls | Session |
+| Session | `analyst/session/` | One browser session's state (`AnalystSession`): loads a file (`dataset.py`), applies the rate limit (`limiter.py`), keeps the conversation (`state.py`), forgets idle data (`eviction.py`), and turns profiles, results and filters into text and tables the page can show (`display.py`). No Streamlit, so it is tested without a browser | Orchestrator, ingestion, session store |
 | Orchestrator | `analyst/pipeline/analyst.py` | Runs the pipeline, enforces budgets, maps errors to messages, records turns | All pipeline components |
 | CSV loader | `analyst/ingestion/csv_loader.py` | Size check, encoding and delimiter detection, parse as text | `normalize.py` |
 | Excel loader | `analyst/ingestion/excel_loader.py` | Zip-bomb check, sheet list, header detection, parse with calamine | `normalize.py` |
@@ -61,16 +62,28 @@ flowchart TB
 
 ## 3. Session model
 
-Each browser session holds one `AnalystSession` in `st.session_state`:
+Each browser session holds one `AnalystSession` (`analyst/session/state.py`) in `st.session_state`, created on its first run. It is never shared and never in a module global, `st.cache_data` or `st.cache_resource`; tests scan the source for all three.
 
-- `db`: the session's DuckDB connection (ADR 0002)
-- `dataset`: metadata for the active table (original file name, sheet, column mapping, profile)
-- `conversation`: the list of turns
-- `settings`: region, schema-only mode
-- `rate_limiter`: question timestamps
-- `last_active`: for 60-minute idle eviction
+- `db`: the session's DuckDB connection (ADR 0002), which also keeps the time of the last activity
+- `dataset`: what the page shows about the loaded file: the profile, the quality notes, how the file was read (separator, header row, sheet) and a 50-row preview. Built once at load, so a rerun queries nothing
+- `memory` and `history`: the model's last three turns, and the questions and answers the page shows (`ChatEntry`), which also hold the result's CSV once it has been asked for
+- `limiter`: question timestamps, a sliding window of 20 questions in 10 minutes (FR-10.2). Loading another file, a new conversation, and the data being removed for idleness do not reset it
+- `schema_only`: the switch the user chose; applied to the next question, and carried over to the next dataset
+- `expired`: true after the data was removed for idleness, until a file is loaded again
 
-Nothing user-specific is stored in module globals, `st.cache_data` or `st.cache_resource`.
+`load` and `ask` do not raise for a failure of the file or the question. A file that cannot be loaded is a `LoadFailure` with a message; a question that cannot run (today, over the rate limit) is a `ChatEntry` with a notice instead of a response. Loading reads and types the file before the database is touched, so a file that cannot be read leaves the dataset already loaded as it was.
+
+**Idle data.** The session's data is removed after 60 minutes without activity in two ways: when the user comes back (`expire_if_idle`, before the visit counts as activity), and by a sweeper thread for tabs that are left open. The sweeper reads a registry of weak references, so it keeps no session alive, and it holds no data of its own. It is the one thread the app starts, and the only module-level state that points at sessions.
+
+### The interface
+
+`analyst/ui/app.py` draws the page on every run, in this order, so that what a click changes is already changed when it is drawn: password gate, session, idle check, the sidebar's file section (which acts on an upload or a confirmation, and may rerun), the title and notices, the question box, then, with a dataset, the data panel and the conversation, and last the sidebar's privacy and conversation controls. The question box is drawn first because Streamlit pins it to the bottom of the page whatever the call order.
+
+- **Loading a file** is explicit: choosing a file *stages* it and offers how to read it (sheet, separator, header row, with detection as the default) beside a *Load file* button. Replacing a dataset asks first when there is a conversation, because it clears it. After a successful load the uploaded bytes are deleted from Streamlit's own memory (`remove_file` on the run's upload manager) and the uploader is emptied, so the table is the only copy. If Streamlit's release fails, the copy stays until the session ends and the failure is logged by type.
+- **Progress** is shown while a question runs: the orchestrator tells an optional callback when each of its three slow stages begins (understanding, running, explaining), and the page shows one line for it. A failing callback never fails the question.
+- **Text from outside is never markup.** Everything that came from the file, the user or the model is shown through `escape_markdown` (every ASCII punctuation mark escaped, and a zero-width space inside web and email addresses, which Streamlit would otherwise link even when escaped), except the model's explanation, which has already had links, images and addresses removed (`sanitize_text`) and is shown with only `$` escaped. No call uses `unsafe_allow_html`. Tables are made of text, so Arrow never sees a mixed column.
+- **A download is safe to open in a spreadsheet:** a text cell or heading that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading apostrophe. Numbers are not touched.
+- **Charts** are drawn with `theme=None`, so Streamlit does not replace the validated colours, once for light and once for dark.
 
 ## 4. Data contracts
 
@@ -96,15 +109,17 @@ Failures are raised as typed errors from `analyst/core/errors.py`, each with a `
 
 ## 5. Dataset loading flow
 
-1. UI receives the uploaded bytes; size and extension are checked.
-2. Excel: the zip's uncompressed size is checked, sheets are listed, the user picks one.
+1. UI stages the uploaded file; extension is checked by the uploader and size by the loader.
+2. Excel: the zip's uncompressed size is checked, sheets are listed, the user picks one (visible sheets first).
 3. Loader parses to a dataframe of strings, detecting encoding, delimiter and header row.
 4. Normaliser infers types (day-first dates by region), flags ambiguous dates and censored values, and maps names to identifiers.
 5. Session store loads the dataframe with `CREATE TABLE ... AS`, then applies the lockdown settings.
 6. Profiler computes the profile and quality summary in SQL; context builder renders the schema card.
 7. UI shows preview, profile and quality summary; the conversation starts empty.
 
-Uploaded bytes are never written to disk.
+`load_dataset` (`analyst/session/dataset.py`) is the one place that knows the order of steps 3 to 6. Steps 3 and 4 happen before the session's database is touched. A failure after step 5 closes the database, so no table is left that was not profiled.
+
+Uploaded bytes are never written to disk, and after a successful load the UI deletes Streamlit's copy of them (section 3).
 
 ## 6. Question flow
 
@@ -130,7 +145,7 @@ Budgets per question: 2 correction attempts and 5 LLM calls in total, with one c
 
 ### The orchestrator
 
-`Analyst` (`analyst/pipeline/analyst.py`) is created once per loaded dataset, with the session's database, the dataset profile, the model client and the session's `ConversationMemory`. `Analyst.ask(question)` returns an `AnalystResponse` and does not raise for a failure of the question. In order:
+`Analyst` (`analyst/pipeline/analyst.py`) is created once per loaded dataset, with the session's database, the dataset profile, the model client and the session's `ConversationMemory`. `Analyst.ask(question, on_progress=None)` returns an `AnalystResponse` and does not raise for a failure of the question. `on_progress` is called with `understanding` before the first model call, `running` before the query loop and `explaining` before the explanation, each only when it is reached (a clarification only says `understanding`); an exception in it is logged by type and ignored. In order:
 
 1. **The question** is cleaned (`clean_question`: printable text, stripped, 1 to 2,000 characters). A question that is empty or too long is a `failed` response with no model call, no activity on the session and no turn in memory.
 2. **Generate.** The generator is given the question, the profile, three sample rows (read from the table once, none in schema-only mode), the memory's last three turns, and the assumptions carried from earlier answered turns, which the `HISTORY` block lists before the turns (`ContextBuilder.generation_context(carried_assumptions=...)`) so an assumption outlives its turn leaving the window (ADR 0011). The window the model is shown and the window memory keeps are one constant (`WINDOW_TURNS`).

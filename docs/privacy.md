@@ -8,19 +8,19 @@
 
 This is the text of the notice shown on upload (T1.18):
 
-> Your file stays in this browser session's memory and is deleted when you close the tab or after 60 minutes of inactivity. To answer questions, the app sends OpenAI the column names and types, summary statistics, a few common values per column, three sample rows, and your question. Turn on schema-only mode to send no sample rows or values. OpenAI does not use API data to train its models by default.
+> Your file stays in this browser session's memory and is deleted when you close the tab or after 60 minutes of inactivity. To answer questions, the app sends OpenAI the column names and types, summary statistics, a few common values per column, three sample rows, and your question, and the rows of each result so that they can be explained. Schema-only mode leaves out the sample rows and common values, but results are still sent. OpenAI does not use API data to train its models by default.
 
 ## 2. What is stored, where, and for how long
 
 | Data | Where | Retention |
 | --- | --- | --- |
-| Uploaded file bytes | Process memory only, during parsing | Discarded after loading |
-| Dataset table | Session's in-memory DuckDB | Until the session ends or 60 idle minutes |
+| Uploaded file bytes | Streamlit's upload buffer for the session, from choosing the file until it is loaded (so the user can try another setting if it fails); then parsing | Deleted from Streamlit's buffer as soon as the file loads. If that fails the copy stays until the session ends, and the failure is logged (error type only) |
+| Dataset table | Session's in-memory DuckDB | Until the session ends or 60 idle minutes: removed when the user comes back after the limit, and by a background sweeper for tabs left open |
 | Conversation | `st.session_state` | Same as above |
 | Logs | Railway log stream | Railway's log retention; metadata only (see section 5) |
 | Data sent to OpenAI | OpenAI | Per OpenAI terms (section 4) |
 
-Nothing is written to disk by the app. A Railway restart deletes all sessions.
+Nothing is written to disk by the app. A Railway restart deletes all sessions. Replacing the dataset, or removing it for idleness, closes the old database; a rate limit is the one thing kept across both, so it cannot be reset by uploading again.
 
 ## 3. What is sent to OpenAI
 
