@@ -7,7 +7,10 @@ dataset values.
 
 from __future__ import annotations
 
-from typing import ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
+
+if TYPE_CHECKING:
+    from analyst.core.models import Usage
 
 IngestionCategory = Literal[
     "unsupported_type",
@@ -112,10 +115,20 @@ class LLMError(AnalystError):
     }
 
     def __init__(
-        self, category: LLMCategory, detail: str = "", *, user_message: str | None = None
+        self,
+        category: LLMCategory,
+        detail: str = "",
+        *,
+        user_message: str | None = None,
+        usage: Usage | None = None,
     ) -> None:
-        """Create an LLM error for one of the known categories."""
+        """Create an LLM error for one of the known categories.
+
+        ``usage`` is set when the call reached the model and was billed even though its
+        answer was unusable, so the caller can still count the tokens and cost.
+        """
         super().__init__(category, detail, user_message=user_message)
+        self.usage = usage
 
 
 class BudgetExceededError(AnalystError):

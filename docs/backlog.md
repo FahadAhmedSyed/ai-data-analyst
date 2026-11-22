@@ -13,6 +13,7 @@
 | T1.06 | Add a catalog integrity check after every query; mark the session corrupted and ask for a reload if the table changed | Spike note A1: DuckDB has no read-only in-memory mode |
 | T1.08 | Function allowlist keyed on SQLGlot expression classes; rule V4 rejects path-like or schema-qualified table names; default-deny node allowlist; executed text regenerated from the validated tree; dangerous functions rejected; new category `unsupported_syntax`; single-row join refinement (security.md, implementation notes) | Spike notes B1 and B2; probes during T1.08 |
 | T1.09 | Call `SessionDatabase.verify_catalog()` after every query, inside `db.lock`; map `OutOfMemoryException` to `out_of_memory`; run each query with a timer calling `db.interrupt()`; execute only `ValidationResult.safe_sql`, and confirm on the session connection with `extract_statements` that it is exactly one `SELECT` | T1.06: spilling is disabled, so an over-cap query fails instead of spilling to disk. T1.08: the validator already makes the same check on a parse-only connection |
+| T1.10 | Use the Responses API (not Chat Completions); add `LLM_PRICES` so cost is computed from configured prices, since model names and prices are unknown until spike T0.4 (c); count calls with a per-question `CallBudget`; carry `usage` on `LLMError` so billed calls with unusable answers are still counted; the `correct` stage uses the generate model | ADR 0004 leaves the API and price source open; R9 asks for configurable models and cost logging |
 | T1.11 | The schema card is already rendered by `analyst/ingestion/schema_card.py` (names, types, ranges, frequent values, 80-character cut, budget fitting). The context builder adds sample rows, region rules and the untrusted-data block, and should check the card's token estimate (3 characters per token) against real token counts from the API | T1.07: no tokenizer is available offline |
 | T1.12 | Starts only after spike T0.4 (c) confirms or replaces ADR 0006 | Model comparison pending |
 | T1.14 | Split in two PRs because the explainer call needs the LLM client from T1.10. Part 1 is the grounding check, caveats for truncation and missing values, the empty-result answer and the template answer. Part 2 is the explainer prompt, its input (all rows up to 50, else 20 rows plus summary statistics, fenced as untrusted data) and the one regeneration. Rounding is strict (half a unit of the last digit, trailing zeros not treated as rounding) until the benchmark's fallback rate says otherwise | ADR 0017 |
@@ -30,9 +31,9 @@
 | T1.05 | Type inference and column mapping | M | T1.03 | M1 | Done |
 | T1.06 | Session DuckDB, lockdown, catalog integrity check | M | T1.02 | M1 | Done |
 | T1.07 | Profiler and schema card | M | T1.05, T1.06 | M1 | Done |
-| T1.08 | SQL validator | L | T1.06 | M2 | In review |
-| T1.09 | Query executor | M | T1.08 | M2 | In review |
-| T1.10 | LLM client and fake | M | T1.02 | M3 | Ready |
+| T1.08 | SQL validator | L | T1.06 | M2 | Done |
+| T1.09 | Query executor | M | T1.08 | M2 | Done |
+| T1.10 | LLM client and fake | M | T1.02 | M3 | In review |
 | T1.11 | Prompts, region rules, context builder | M | T1.07 | M3 | Ready |
 | T1.12 | Intent and SQL generator | M | T1.10, T1.11, spike (c) | M3 | Blocked on OpenAI key |
 | T1.13 | Corrector and retry loop | M | T1.09, T1.12 | M3 | Waiting |
