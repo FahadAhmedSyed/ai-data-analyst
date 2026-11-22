@@ -45,6 +45,7 @@
 | T11 | Key from environment only; `.env` git-ignored; `.env.example` has names only; secret scanning in CI | Repository | CI |
 | T12 | Markdown rendered with HTML disabled (Streamlit default); no `unsafe_allow_html` anywhere | UI | UI test with HTML in data |
 | T12 | Text from the explainer and the generator (restatement, assumptions, clarifying question, refusal) has links reduced to their text, images replaced by their alt text, and web and email addresses removed before it is checked or shown, so an injected image address cannot send data out when the answer renders | Explainer, generator, `safe_text` | Explainer and generator tests with a data-carrying image and link |
+| T12 | Column names, categories and group names in charts are cut, flattened and escaped (`&`, `<`, `>`, `%{`) before they reach Plotly | Charts | Chart tests with HTML in names; headless browser check |
 
 ### Prompt containment (T1.11)
 
