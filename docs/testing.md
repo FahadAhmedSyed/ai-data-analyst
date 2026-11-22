@@ -36,7 +36,7 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Validator | 60+ adversarial queries rejected with the right category; 40+ valid queries (including all benchmark gold SQL) accepted; one test per allowlisted function | `tests/unit/sql_cases.yaml` |
 | Executor | Timeout fires within limit + 1 s; truncation flag; each error category; forged or unvalidated results never run; catalog check after every query; all validator corpora and allowlisted functions run end to end on the locked-down session | In-memory |
 | LLM client | Retry on 429 and 5xx; no retry on 4xx; timeout; cost calculation; `store=false` sent | Mocked transport |
-| Context builder | Prompt snapshots; injection text stays inside the untrusted block; schema-only mode omits values | Fixtures |
+| Context builder | Snapshots of the system prompt and of the user message in full and schema-only mode (`tests/unit/snapshots/`, rewritten with `UPDATE_SNAPSHOTS=1`); canary values prove schema-only mode sends no cell value; file text cannot forge a marker line; at most three sample rows, three turns and one result preview; every construct the prompt recommends passes the validator; the function list equals the allowlist | Fixtures and the synthetic sales table |
 | Generator | Each structured output shape; intent column check; clarification gate | Fake LLM |
 | Corrector | Each category; budget exhaustion; Reject never retried | Fake LLM |
 | Grounding | Number formats (1,234.5; 12%; -3.2; 1e3); rounding; numbers from the question and assumptions allowed; invented number caught | Inline |
