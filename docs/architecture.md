@@ -47,9 +47,10 @@ flowchart TB
 | Session store | `analyst/database/session_db.py` | Per-session DuckDB, table load, lockdown, catalog, idle eviction | DuckDB |
 | Executor | `analyst/database/executor.py` | Run validated SQL with timeout and row cap; classify errors | Session store |
 | Context builder | `analyst/sql/context.py` | Adds sample rows, region rules and the untrusted-data block around the schema card | Profiler output |
-| Generator | `analyst/sql/generator.py` | One structured call: intent, then SQL or clarification (ADR 0006) | LLM client, context |
+| Generator | `analyst/pipeline/generator.py` | One structured call: intent, then SQL or clarification (ADR 0006) | LLM client, context |
 | Validator | `analyst/sql/validator.py` | SQLGlot AST checks (ADR 0005) | Catalog |
-| Corrector | `analyst/sql/corrector.py` | Category-specific repair, at most 2 attempts | LLM client, validator |
+| Corrector | `analyst/pipeline/corrector.py` | One repair call on the generator's conversation, with the validator's reason or the database's message | LLM client, context |
+| Query loop | `analyst/pipeline/query_loop.py` | Validate, run and correct within the limits: 2 corrections, a heavy query once, one call kept for the explainer | Validator, executor, corrector |
 | Explainer | `analyst/pipeline/explainer.py` | Plain-language answer with key numbers | LLM client |
 | Grounding check | `analyst/pipeline/grounding.py` | Match every number in the answer to the result (ADR 0017) | None |
 | Chart recommender | `analyst/visualization/recommender.py` | Choose chart type from result shape and intent | None |
@@ -126,6 +127,25 @@ flowchart TB
 ```
 
 Budgets per question: 2 correction attempts and 5 LLM calls in total, with one call always kept for the explanation.
+
+### The orchestrator
+
+`Analyst` (`analyst/pipeline/analyst.py`) is created once per loaded dataset, with the session's database, the dataset profile, the model client and the session's `ConversationMemory`. `Analyst.ask(question)` returns an `AnalystResponse` and does not raise for a failure of the question. In order:
+
+1. **The question** is cleaned (`clean_question`: printable text, stripped, 1 to 2,000 characters). A question that is empty or too long is a `failed` response with no model call, no activity on the session and no turn in memory.
+2. **Generate.** The generator is given the question, the profile, three sample rows (read from the table once, none in schema-only mode), the memory's last three turns, and the assumptions carried from earlier answered turns, which the `HISTORY` block lists before the turns (`ContextBuilder.generation_context(carried_assumptions=...)`) so an assumption outlives its turn leaving the window (ADR 0011). The window the model is shown and the window memory keeps are one constant (`WINDOW_TURNS`).
+3. **By kind.** `clarification` is returned as a `clarification` response and nothing runs. `refused` is a `failed` response carrying the model's explanation (benchmark case I02). `sql` goes on.
+4. **Run.** `QueryLoop.run` (section 7) with the question's `CallBudget`. Any status but `ok` is a `failed` response whose message is the loop's; its `sql` is the last query tried, so the user can see what was refused or could not be fixed, and the turn keeps none, so a follow-up is not built on it.
+5. **Explain and chart.** The explainer gets the corrected answer's restatement, intent, SQL and assumptions. The chart is the model's suggestion if it fits the result, else by rule (`recommend_chart`); a failure there costs only the chart. The response carries the explanation (`message`, `caveats`, `fallback_used`), `grounded` true (each number was checked against the result or written by code from it), the result and the chart.
+6. **Record** the turn (every response but a bad question): question, restatement, intent, and, when answered, the SQL, assumptions, answer text and a summary of the result. Clarification and failed turns carry no assumptions, so nothing unsettled carries forward.
+
+One `ContextBuilder` per `Analyst` is shared by the generator, the corrector and the explainer, so one marker code covers every prompt of the session and two sessions never share one. `schema_only` is an attribute the interface may change between questions.
+
+**Errors.** Every typed error becomes a `failed` response with its `user_message`: `LLMError` (its `usage` is still counted), `BudgetExceededError`, `SessionCorruptedError`. Any other exception is a bug: the user sees "Something went wrong. Please try again.", the log carries the exception's type and not its message, and the turn is recorded as failed. `RateLimitedError` belongs to the interface (FR-10.2).
+
+**Usage.** `AnalystResponse.usage` adds up every call that reached the model, including unusable ones. Its `latency_ms` is the wall-clock time of the whole question, because ADR 0013 measures p95 question latency, not the sum of the model calls.
+
+**Logs.** One `question` line: status, kind, run status, corrections, attempts, explanation source and fallback reason, chart type, row count, truncation, schema-only flag, call count, tokens, cost and latency. Never the question, the SQL or any text from the model.
 
 ## 7. Text-to-SQL details
 

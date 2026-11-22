@@ -121,6 +121,7 @@ class Generator:
         *,
         sample_rows: Sequence[Mapping[str, Any]] = (),
         history: Sequence[Turn] = (),
+        carried_assumptions: Sequence[str] = (),
         schema_only: bool = False,
         budget: CallBudget | None = None,
     ) -> Generation:
@@ -131,6 +132,7 @@ class Generator:
             profile: The dataset profile.
             sample_rows: Rows of the table, for the prompt (ignored in schema-only mode).
             history: Earlier turns, oldest first.
+            carried_assumptions: Assumptions from answered turns that still apply.
             schema_only: Send no values from the file (ADR 0010).
             budget: The question's call budget; each model call is charged to it.
 
@@ -145,6 +147,7 @@ class Generator:
             profile,
             sample_rows=sample_rows,
             history=history,
+            carried_assumptions=carried_assumptions,
             schema_only=schema_only,
         )
         opening = (Message("system", context.system), Message("user", context.user))
