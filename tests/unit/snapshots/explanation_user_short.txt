@@ -1,0 +1,19 @@
+<<<QUESTION a1b2c3d4e5f6>>>
+Total revenue by region?
+Restated: What is the total revenue per region?
+<<<END QUESTION a1b2c3d4e5f6>>>
+
+<<<ANALYSIS a1b2c3d4e5f6>>>
+Intent: {"operation":"aggregate","measures":[{"column":"revenue","aggregation":"sum"}],"dimensions":["region"],"filters":[],"sort":[],"output":"table"}
+Assumption: Revenue means the revenue column.
+SQL: SELECT region, SUM(revenue) AS total_revenue FROM sales GROUP BY 1
+<<<END ANALYSIS a1b2c3d4e5f6>>>
+
+<<<RESULT a1b2c3d4e5f6>>>
+Rows returned: 3. All of them are shown below.
+Columns: region, total_revenue.
+Rows, one JSON object per line:
+{"region": "North", "total_revenue": 1500.25}
+{"region": "South", "total_revenue": 1200.0}
+{"region": "East", "total_revenue": 410.5}
+<<<END RESULT a1b2c3d4e5f6>>>

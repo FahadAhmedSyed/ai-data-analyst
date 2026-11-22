@@ -44,8 +44,13 @@ from typing import Any
 import pandas as pd
 
 from analyst.config.domain import RegionRules, get_region
-from analyst.config.prompts import FENCE_CLOSE, FENCE_OPEN, generation_system_prompt
-from analyst.core.models import DatasetProfile, ResultSummary, Turn
+from analyst.config.prompts import (
+    FENCE_CLOSE,
+    FENCE_OPEN,
+    explainer_system_prompt,
+    generation_system_prompt,
+)
+from analyst.core.models import DatasetProfile, Intent, QueryResult, ResultSummary, Turn
 from analyst.database.session_db import SessionDatabase, quote_identifier
 from analyst.ingestion.schema_card import (
     DEFAULT_MAX_TOKENS,
@@ -54,6 +59,8 @@ from analyst.ingestion.schema_card import (
     estimate_tokens,
     render_schema_card,
 )
+from analyst.pipeline.result_digest import ResultDigest, digest_result
+from analyst.pipeline.result_notes import format_number
 from analyst.sql.validator import ALLOWED_FUNCTION_NAMES
 
 SAMPLE_ROWS = 3
@@ -73,6 +80,16 @@ class GenerationContext:
     user: str
     schema_card: SchemaCard
     approx_tokens: int  # estimate for system and user together, to compare with real usage
+
+
+@dataclass(frozen=True)
+class ExplanationContext:
+    """What one explanation call is sent."""
+
+    system: str
+    user: str
+    extra_numbers: tuple[float, ...]  # statistics shown to the model, for the grounding check
+    approx_tokens: int
 
 
 class ContextBuilder:
@@ -144,6 +161,59 @@ class ContextBuilder:
             user=user,
             schema_card=card,
             approx_tokens=estimate_tokens(self._system) + estimate_tokens(user),
+        )
+
+    def explanation_context(
+        self,
+        question: str,
+        result: QueryResult,
+        *,
+        resolved_question: str | None = None,
+        intent: Intent | None = None,
+        sql: str | None = None,
+        assumptions: Sequence[str] = (),
+    ) -> ExplanationContext:
+        """Assemble the prompt that asks the model to explain ``result``.
+
+        The result goes in whatever the privacy mode, because the answer has to describe it
+        (ADR 0010): every row of a result of 50 rows or fewer, otherwise the first 20 rows
+        and statistics over all of them. Rows are cut to 30 columns.
+
+        Args:
+            question: The user's question.
+            result: The executed result; it must not be empty.
+            resolved_question: The question restated on its own, if it differs.
+            intent: How the question was read.
+            sql: The query that ran.
+            assumptions: The assumptions shown with the answer.
+        """
+        digest = digest_result(result)
+        asked = [_one_line(question, MAX_QUESTION_CHARS)]
+        if resolved_question and resolved_question.strip() != question.strip():
+            asked.append(f"Restated: {_one_line(resolved_question, MAX_QUESTION_CHARS)}")
+        analysis: list[str] = []
+        if intent is not None:
+            analysis.append(
+                f"Intent: {_one_line(intent.model_dump_json(exclude_none=True), 1_500)}"
+            )
+        analysis.extend(f"Assumption: {_one_line(a, MAX_NOTE_CHARS)}" for a in assumptions)
+        if sql:
+            analysis.append(f"SQL: {_one_line(sql, MAX_SQL_CHARS)}")
+        if not analysis:
+            analysis.append("(no analysis was recorded)")
+        user = "\n\n".join(
+            [
+                self._fence("QUESTION", asked),
+                self._fence("ANALYSIS", analysis),
+                self._fence("RESULT", _result_lines(result, digest)),
+            ]
+        )
+        system = explainer_system_prompt()
+        return ExplanationContext(
+            system=system,
+            user=user,
+            extra_numbers=digest.numbers,
+            approx_tokens=estimate_tokens(system) + estimate_tokens(user),
         )
 
     # -- blocks ------------------------------------------------------------------------------
@@ -277,4 +347,39 @@ def _summary_lines(summary: ResultSummary, schema_only: bool) -> list[str]:
         shown = summary.preview_rows[:PREVIEW_ROWS]
         lines.append(f"First {len(shown)} rows:")
         lines += [_row_json(summary.columns, row) for row in shown]
+    return lines
+
+
+# -- explanation -------------------------------------------------------------------------------
+
+
+def _result_lines(result: QueryResult, digest: ResultDigest) -> list[str]:
+    total = format_number(digest.total_rows)
+    columns = ", ".join(clean_text(c) for c in digest.columns_shown)
+    if digest.complete:
+        lines = [f"Rows returned: {total}. All of them are shown below."]
+    else:
+        shown = format_number(len(digest.rows))
+        lines = [
+            f"Rows returned: {total}. Only the first {shown} are shown below; the statistics "
+            f"further down cover all {total} rows."
+        ]
+    if result.truncated:
+        lines.append(
+            "The query hit the row cap, so more rows exist than were returned. "
+            "Say so in the answer."
+        )
+    lines.append(f"Columns: {columns}.")
+    if digest.columns_hidden:
+        lines.append(
+            f"{format_number(digest.columns_hidden)} more columns exist and are not shown."
+        )
+    lines.append("Rows, one JSON object per line:")
+    lines += [
+        _row_json(digest.columns_shown, row)
+        for row in digest.rows.set_axis(digest.columns_shown, axis=1).to_dict(orient="records")
+    ]
+    if digest.stats:
+        lines.append("Statistics computed by software over all returned rows:")
+        lines += [f"- {stats.line}" for stats in digest.stats]
     return lines

@@ -37,12 +37,14 @@
 | T1 to T3 | DuckDB lockdown (section 5) | Database | Lockdown tests |
 | T4 | Cost rules in validator; timeout via `interrupt()`; memory cap; row cap | Validator, executor | Executor limit tests |
 | T5, T6 | Model output is only SQL plus text, both checked; data placed in a marked untrusted block, cut to 80 characters; identifiers normalised; model has no tools or secrets | Prompt, validator | Injection fixtures and benchmark cases |
+| T5, T6 | The explanation call gets the result, question and SQL in the same kind of marked blocks (random code, text flattened and cut); every number in what it returns is checked against the result in code, and the text cannot carry an address or image | Prompt, grounding, explainer | Marker-forging tests on the explanation prompt; grounding and explainer tests |
 | T7 | Size check before parse; zip uncompressed-size check; row and column caps; defusedxml installed | Ingestion | Oversized and zip-bomb fixtures |
 | T8 | Per-session DuckDB in `st.session_state`; no user data in globals or Streamlit caches | Session | Two-session AppTest |
 | T9 | Shared password; OpenAI project spend cap; 20 questions per 10 minutes per session | UI, account | Gate and limiter tests |
 | T10 | Logs carry metadata only; SQL text behind a debug flag | Logging | Log assertion tests |
 | T11 | Key from environment only; `.env` git-ignored; `.env.example` has names only; secret scanning in CI | Repository | CI |
 | T12 | Markdown rendered with HTML disabled (Streamlit default); no `unsafe_allow_html` anywhere | UI | UI test with HTML in data |
+| T12 | Text from the explainer has links reduced to their text, images replaced by their alt text, and web and email addresses removed before it is checked or shown, so an injected image address cannot send data out when the answer renders | Explainer | Explainer tests with a data-carrying image and link |
 | T12 | Column names, categories and group names in charts are cut, flattened and escaped (`&`, `<`, `>`, `%{`) before they reach Plotly | Charts | Chart tests with HTML in names; headless browser check |
 
 ### Prompt containment (T1.11)
