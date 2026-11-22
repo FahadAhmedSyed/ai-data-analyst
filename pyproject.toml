@@ -1,0 +1,62 @@
+[project]
+name = "ai-data-analyst"
+version = "0.1.0"
+description = "Ask questions about CSV and Excel data in plain English; answers come from validated SQL run on DuckDB."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "charset-normalizer>=3.4",
+    "defusedxml>=0.7",
+    "duckdb>=2.0.1",
+    "openai>=2.0",
+    "openpyxl>=3.1",
+    "pandas>=3.1.1",
+    "plotly>=6.0",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "python-calamine>=0.3",
+    "sqlglot>=30.33.0",
+    "streamlit>=1.67.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "pyyaml>=6.0",
+    "ruff>=0.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["analyst"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "S", "N", "ANN"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers -m 'not live and not slow'"
+markers = [
+    "live: calls the OpenAI API; excluded by default",
+    "slow: takes more than 5 seconds; excluded by default",
+]
+
+[tool.coverage.run]
+source = ["analyst"]
+omit = ["analyst/ui/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
