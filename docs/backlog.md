@@ -11,8 +11,8 @@
 | T1.01 | Pin DuckDB 2.0.1, SQLGlot 30.33.0, pandas 3.1.1, Streamlit 1.67.0 (or newer patch releases re-tested) | Versions validated in spikes |
 | T1.05 | Written against pandas 3 string dtype behaviour | pandas 3 default |
 | T1.06 | Add a catalog integrity check after every query; mark the session corrupted and ask for a reload if the table changed | Spike note A1: DuckDB has no read-only in-memory mode |
-| T1.08 | Function allowlist keyed on SQLGlot expression classes; rule V4 rejects path-like or schema-qualified table names | Spike notes B1 and B2 |
-| T1.09 | Call `SessionDatabase.verify_catalog()` after every query, inside `db.lock`; map `OutOfMemoryException` to `out_of_memory`; run each query with a timer calling `db.interrupt()` | T1.06: spilling is disabled, so an over-cap query fails instead of spilling to disk |
+| T1.08 | Function allowlist keyed on SQLGlot expression classes; rule V4 rejects path-like or schema-qualified table names; default-deny node allowlist; executed text regenerated from the validated tree; dangerous functions rejected; new category `unsupported_syntax`; single-row join refinement (security.md, implementation notes) | Spike notes B1 and B2; probes during T1.08 |
+| T1.09 | Call `SessionDatabase.verify_catalog()` after every query, inside `db.lock`; map `OutOfMemoryException` to `out_of_memory`; run each query with a timer calling `db.interrupt()`; execute only `ValidationResult.safe_sql`, and confirm on the session connection with `extract_statements` that it is exactly one `SELECT` | T1.06: spilling is disabled, so an over-cap query fails instead of spilling to disk. T1.08: the validator already makes the same check on a parse-only connection |
 | T1.11 | The schema card is already rendered by `analyst/ingestion/schema_card.py` (names, types, ranges, frequent values, 80-character cut, budget fitting). The context builder adds sample rows, region rules and the untrusted-data block, and should check the card's token estimate (3 characters per token) against real token counts from the API | T1.07: no tokenizer is available offline |
 | T1.12 | Starts only after spike T0.4 (c) confirms or replaces ADR 0006 | Model comparison pending |
 | T1.18 | Progress indicator during Excel parsing | Spike (d): up to about 14 s at the size limit |
@@ -22,14 +22,14 @@
 
 | ID | Task | Size | Depends on | Milestone | Status |
 | --- | --- | --- | --- | --- | --- |
-| T1.01 | Project scaffold, settings, logging, CI | S | Repository created | M1 | In review |
-| T1.02 | Core models and error types | S | T1.01 | M1 | In review |
-| T1.03 | CSV loader | M | T1.02 | M1 | In review |
-| T1.04 | Excel loader | M | T1.02 | M1 | In review |
-| T1.05 | Type inference and column mapping | M | T1.03 | M1 | In review |
-| T1.06 | Session DuckDB, lockdown, catalog integrity check | M | T1.02 | M1 | In review |
-| T1.07 | Profiler and schema card | M | T1.05, T1.06 | M1 | In review |
-| T1.08 | SQL validator | L | T1.06 | M2 | Ready |
+| T1.01 | Project scaffold, settings, logging, CI | S | Repository created | M1 | Done |
+| T1.02 | Core models and error types | S | T1.01 | M1 | Done |
+| T1.03 | CSV loader | M | T1.02 | M1 | Done |
+| T1.04 | Excel loader | M | T1.02 | M1 | Done |
+| T1.05 | Type inference and column mapping | M | T1.03 | M1 | Done |
+| T1.06 | Session DuckDB, lockdown, catalog integrity check | M | T1.02 | M1 | Done |
+| T1.07 | Profiler and schema card | M | T1.05, T1.06 | M1 | Done |
+| T1.08 | SQL validator | L | T1.06 | M2 | In review |
 | T1.09 | Query executor | M | T1.08 | M2 | Ready |
 | T1.10 | LLM client and fake | M | T1.02 | M3 | Ready |
 | T1.11 | Prompts, region rules, context builder | M | T1.07 | M3 | Ready |
