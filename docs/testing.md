@@ -35,7 +35,7 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Profiler | Every value matches pandas on fixtures; schema card under budget for 150 columns | Fixtures |
 | Validator | 60+ adversarial queries rejected with the right category; 40+ valid queries (including all benchmark gold SQL) accepted; one test per allowlisted function | `tests/unit/sql_cases.yaml` |
 | Executor | Timeout fires within limit + 1 s; truncation flag; each error category; forged or unvalidated results never run; catalog check after every query; all validator corpora and allowlisted functions run end to end on the locked-down session | In-memory |
-| LLM client | Retry on 429 and 5xx; no retry on 4xx; timeout; cost calculation; `store=false` sent | Mocked transport |
+| LLM client | Request shape (endpoint, strict schema, `store=false`, model per stage); retry on 429, 5xx and connection errors with `Retry-After`; no retry on 4xx, timeout or exhausted quota; refusal, truncation and misfit are `invalid_output` and carry their usage; not configured fails before any request; budget charged once per call; cost from configured prices; no prompt, answer or key in logs | Mocked HTTP transport, real SDK |
 | Context builder | Snapshots of the system prompt and of the user message in full and schema-only mode (`tests/unit/snapshots/`, rewritten with `UPDATE_SNAPSHOTS=1`); canary values prove schema-only mode sends no cell value; file text cannot forge a marker line; at most three sample rows, three turns and one result preview; every construct the prompt recommends passes the validator; the function list equals the allowlist | Fixtures and the synthetic sales table |
 | Generator | Each structured output shape; intent column check; clarification gate | Fake LLM |
 | Corrector | Each category; budget exhaustion; Reject never retried | Fake LLM |
@@ -54,7 +54,7 @@ For every analytical path that produces numbers (profiler, executor results used
 
 ## 5. Fake LLM
 
-`analyst/llm/fake.py` takes a script: a list of expected call kinds (generate, correct, explain) and the structured output to return for each. It fails the test if calls arrive in a different order or exceed the script. This makes budget and retry behaviour testable without the network.
+`analyst/llm/fake.py` takes a script with one item per expected call: a Pydantic instance, a dict or raw JSON string (validated against the requested model, so a misfit is `invalid_output`), an exception to raise, or a function of the call. Wrapping an item as `(stage, item)` makes the test fail if the call is for a different stage. The fake charges the call budget like the real client, records every call (`calls`, `stages`), fails on a call past the end of the script, and `assert_exhausted()` fails if scripted answers were never used. This makes budget and retry behaviour testable without the network.
 
 ## 6. CI
 
