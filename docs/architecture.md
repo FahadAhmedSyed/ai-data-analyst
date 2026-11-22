@@ -141,7 +141,19 @@ Schema-only mode (ADR 0010) leaves out the sample rows, the frequent values and 
 
 ### Generation (LLM call 1)
 
-Returns `GenerationResult` with fields in the order shown in section 4, so intent precedes SQL. Code checks every intent column exists in the catalog before validation.
+Returns `GenerationResult` with fields in the order shown in section 4, so intent precedes SQL. `Generator.generate` (`analyst/pipeline/generator.py`) makes the call and decides what the answer is, in code:
+
+| `Generation.kind` | When | Then |
+| --- | --- | --- |
+| `sql` | The model gave SQL and did not need to ask | Validate and run it |
+| `clarification` | `needs_clarification` with a question, and at least one ambiguity has `changes_result` true | Ask the user the question; nothing runs |
+| `refused` | No SQL, no question, and an explanation: the request was to change data, read files or ignore the rules (benchmark case I02) | Answer `failed` with the model's explanation; nothing runs |
+
+- **The clarification gate** (ADR 0011) is in code. If the model asks but none of its ambiguities would change the result: with SQL, the SQL runs and `clarification_overridden` is set; without SQL, the model is told once to take the most likely reading and write the SQL. If it asks again the question is passed on rather than failing the user.
+- **Unusable answers.** An inconsistent answer (asks but gives no question, or gives no SQL, question or explanation) and an `invalid_output` error are each asked for again once. A second failure raises `LLMError("invalid_output")` carrying the cost of both calls. Other errors (timeout, rate limit, API error, not configured) are raised at once, and a spent budget raises `BudgetExceededError` before any call. There is no template fallback here: a question that was never understood has nothing to show.
+- **Intent columns.** `Generation.unknown_columns` lists every intent column that is not a column of the table (SQL names, any capitalisation), with up to three closest real names (matched against SQL names and the original headers). `intent_problem` words it for the corrector. The orchestrator sends it to correction before validation, as an unknown-column error.
+- **Text for the user** (restatement, assumptions, ambiguities, clarifying question, explanation) is cleaned with `sanitize_text` (`analyst/pipeline/safe_text.py`: links reduced to text, images to alt text, addresses removed). The clarifying question and the refusal are also flattened and cut to 600 characters. The SQL is not touched; the validator judges it.
+- **Hand-off.** `Generation.opening` holds the system and user messages that were sent, so the corrector can continue the same conversation. `approx_tokens` is the builder's estimate, logged next to the real `input_tokens` so the 3-characters-per-token rule can be checked once there is a key.
 
 ### Validation (code only)
 

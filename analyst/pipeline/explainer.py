@@ -33,6 +33,7 @@ from analyst.core.models import Intent, KeyNumber, ModelExplanation, QueryResult
 from analyst.llm.client import CallBudget, LLMClient, Message
 from analyst.pipeline.grounding import GroundingIssue, GroundingReport, check_grounding
 from analyst.pipeline.result_notes import empty_result_answer, result_caveats, template_answer
+from analyst.pipeline.safe_text import sanitize_text
 from analyst.sql.context import ContextBuilder
 
 log = get_logger(__name__)
@@ -66,32 +67,6 @@ class Explanation:
 
 
 # -- text safety ---------------------------------------------------------------------------------
-
-_IMAGE = re.compile(r"!\[([^\]]*)\]\([^)]*\)|!\[([^\]]*)\]\[[^\]]*\]")
-_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)|\[([^\]]+)\]\[[^\]]*\]")
-_REFERENCE_DEFINITION = re.compile(r"^[ ]{0,3}\[[^\]]+\]:[ ]*\S.*$", re.MULTILINE)
-_AUTOLINK = re.compile(r"<(?:https?://|ftp://|mailto:)[^>\s]*>", re.IGNORECASE)
-_ADDRESS = re.compile(
-    r"(?:https?://|ftp://|www\.)\S*[^\s.,;:!?)\]\"']|\b[\w.+-]+@[\w-]+\.[\w.-]+\b", re.IGNORECASE
-)
-_LINK_REMOVED = "[link removed]"
-
-
-def sanitize_text(text: str) -> str:
-    """Take links, images and web addresses out of text from the model.
-
-    Streamlit renders images in Markdown, so an image address carrying data would send that
-    data out as soon as the answer is shown (threat T12). Links are reduced to their text.
-    HTML is not rendered by the UI, so it is left as text.
-    """
-    text = "".join(ch for ch in text if ch in "\n\t" or ch.isprintable())
-    text = _REFERENCE_DEFINITION.sub("", text)
-    text = _IMAGE.sub(lambda m: m.group(1) or m.group(2) or "", text)
-    text = _LINK.sub(lambda m: m.group(1) or m.group(2) or "", text)
-    text = _AUTOLINK.sub(_LINK_REMOVED, text)
-    text = _ADDRESS.sub(_LINK_REMOVED, text)
-    return text.strip()
-
 
 _SPELLED_NUMBER = re.compile(
     r"(?<!\d )\b(?:eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
