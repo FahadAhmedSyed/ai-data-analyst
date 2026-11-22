@@ -173,7 +173,7 @@ class Generator:
                 ) from error
             attempts += 1
             usage += response.usage
-            result = _clean(response.parsed)
+            result = clean_result(response.parsed)
             kind, overridden, retry = _classify(result, final=final)
             if kind is None:
                 last_problem = retry
@@ -235,7 +235,7 @@ class Generator:
 # -- reading the answer --------------------------------------------------------------------------
 
 
-def _clean(result: GenerationResult) -> GenerationResult:
+def clean_result(result: GenerationResult) -> GenerationResult:
     """The answer with every text the user will read made safe. The SQL is not touched."""
     return result.model_copy(
         update={

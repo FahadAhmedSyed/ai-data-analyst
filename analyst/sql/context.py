@@ -9,6 +9,9 @@ three marked blocks, in this order so the provider can cache the stable start:
 * ``HISTORY``: the last three turns, and a preview of the most recent result.
 * ``QUESTION``: the user's question.
 
+``correction_message`` makes the follow-up that reports a failed query, with the same
+containment, and ``explanation_context`` the prompt for the explanation call.
+
 What is untrusted, and how it is contained (threats T5 and T6)
 --------------------------------------------------------------
 
@@ -69,6 +72,7 @@ PREVIEW_ROWS = 5
 MAX_QUESTION_CHARS = 2_000
 MAX_SQL_CHARS = 1_500
 MAX_NOTE_CHARS = 300
+MAX_PROBLEM_CHARS = 500
 REMOVED_CODE = "[marker code removed]"
 
 
@@ -215,6 +219,23 @@ class ContextBuilder:
             extra_numbers=digest.numbers,
             approx_tokens=estimate_tokens(system) + estimate_tokens(user),
         )
+
+    def correction_message(self, title: str, details: Sequence[str], request: str) -> str:
+        """The user message that reports why the last query could not be used (T1.13).
+
+        The title and details go in a ``PROBLEM`` block, because the database's message can
+        quote names and values from the file and so is untrusted like the rest of the file's
+        text; each line is flattened and cut like any other. The request, which is fixed
+        text, follows the block.
+
+        Args:
+            title: One sentence naming the problem.
+            details: What the checker or the database said, one line each.
+            request: What the model should do about it.
+        """
+        lines = [_one_line(title, MAX_PROBLEM_CHARS)]
+        lines += [_one_line(detail, MAX_PROBLEM_CHARS) for detail in details]
+        return f"{self._fence('PROBLEM', lines)}\n\n{request}"
 
     # -- blocks ------------------------------------------------------------------------------
 

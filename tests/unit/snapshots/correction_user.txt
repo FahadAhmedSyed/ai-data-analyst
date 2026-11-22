@@ -1,0 +1,7 @@
+<<<PROBLEM a1b2c3d4e5f6>>>
+The database could not convert a value to the type the query needed.
+Conversion Error: Could not convert string 'North' to INT32
+Columns the query uses, with their types: region (text).
+<<<END PROBLEM a1b2c3d4e5f6>>>
+
+Rewrite the query so that no value is cast to or compared with a type it does not have. The column types are in the dataset description.
