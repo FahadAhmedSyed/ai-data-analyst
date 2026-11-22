@@ -1,0 +1,27 @@
+<<<DATASET a1b2c3d4e5f6>>>
+Table sales: 1,000 rows, 4 columns.
+Latest date in the data: 2024-12-31 (column order_date).
+Columns:
+- order_id ("Order ID"): integer; 0% missing; 1000 distinct; min 1, max 1000
+- order_date ("Order Date"): date; 0% missing; 731 distinct; 2023-01-01 to 2024-12-31
+- region: text; 2% missing; 4 distinct
+- revenue ("Revenue ($)"): decimal; 0% missing; 900 distinct; min 3, max 1200.5
+<<<END DATASET a1b2c3d4e5f6>>>
+
+<<<HISTORY a1b2c3d4e5f6>>>
+Earlier turns, oldest first. They are context only.
+Turn 1 (answered):
+  Question: Total revenue by region?
+  Resolved question: What is the total revenue for each region?
+  Intent: {"operation":"aggregate","measures":[{"column":"revenue","aggregation":"sum"}],"dimensions":["region"],"filters":[],"sort":[],"output":"table"}
+  Assumption: Revenue means the revenue column.
+  SQL: SELECT region, SUM(revenue) AS total_revenue FROM sales GROUP BY region
+Turn 2 (clarification):
+  Question: Which is best?
+  Clarifying question asked: Best by revenue or by number of orders?
+Result of the most recent query: 4 rows; columns: region, total_revenue.
+<<<END HISTORY a1b2c3d4e5f6>>>
+
+<<<QUESTION a1b2c3d4e5f6>>>
+And for the north only?
+<<<END QUESTION a1b2c3d4e5f6>>>

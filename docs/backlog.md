@@ -14,7 +14,7 @@
 | T1.08 | Function allowlist keyed on SQLGlot expression classes; rule V4 rejects path-like or schema-qualified table names; default-deny node allowlist; executed text regenerated from the validated tree; dangerous functions rejected; new category `unsupported_syntax`; single-row join refinement (security.md, implementation notes) | Spike notes B1 and B2; probes during T1.08 |
 | T1.09 | Call `SessionDatabase.verify_catalog()` after every query, inside `db.lock`; map `OutOfMemoryException` to `out_of_memory`; run each query with a timer calling `db.interrupt()`; execute only `ValidationResult.safe_sql`, and confirm on the session connection with `extract_statements` that it is exactly one `SELECT` | T1.06: spilling is disabled, so an over-cap query fails instead of spilling to disk. T1.08: the validator already makes the same check on a parse-only connection |
 | T1.10 | Use the Responses API (not Chat Completions); add `LLM_PRICES` so cost is computed from configured prices, since model names and prices are unknown until spike T0.4 (c); count calls with a per-question `CallBudget`; carry `usage` on `LLMError` so billed calls with unusable answers are still counted; the `correct` stage uses the generate model | ADR 0004 leaves the API and price source open; R9 asks for configurable models and cost logging |
-| T1.11 | The schema card is already rendered by `analyst/ingestion/schema_card.py` (names, types, ranges, frequent values, 80-character cut, budget fitting). The context builder adds sample rows, region rules and the untrusted-data block, and should check the card's token estimate (3 characters per token) against real token counts from the API | T1.07: no tokenizer is available offline |
+| T1.11 | The schema card is already rendered by `analyst/ingestion/schema_card.py` (names, types, ranges, frequent values, 80-character cut, budget fitting). The context builder adds sample rows, region rules and the untrusted-data block. The builder returns its token estimate (3 characters per token) so that T1.12 can log it beside the API's real `input_tokens`; the comparison itself needs the key. The prompt tells the model to refuse requests to change data by returning no SQL and no clarification, which the generator (T1.12) must turn into a failed answer with the model's explanation | T1.07: no tokenizer is available offline. Benchmark case I02 expects `failed` |
 | T1.12 | Starts only after spike T0.4 (c) confirms or replaces ADR 0006 | Model comparison pending |
 | T1.18 | Progress indicator during Excel parsing | Spike (d): up to about 14 s at the size limit |
 | T1.20 | Start on a 2 GB Railway instance; memory alert at 75% | Spike (d) sizing |
@@ -32,8 +32,8 @@
 | T1.07 | Profiler and schema card | M | T1.05, T1.06 | M1 | Done |
 | T1.08 | SQL validator | L | T1.06 | M2 | Done |
 | T1.09 | Query executor | M | T1.08 | M2 | Done |
-| T1.10 | LLM client and fake | M | T1.02 | M3 | In review |
-| T1.11 | Prompts, region rules, context builder | M | T1.07 | M3 | Ready |
+| T1.10 | LLM client and fake | M | T1.02 | M3 | Done |
+| T1.11 | Prompts, region rules, context builder | M | T1.07 | M3 | In review |
 | T1.12 | Intent and SQL generator | M | T1.10, T1.11, spike (c) | M3 | Blocked on OpenAI key |
 | T1.13 | Corrector and retry loop | M | T1.09, T1.12 | M3 | Waiting |
 | T1.14 | Explainer and grounding check | M | T1.09, T1.10 | M3 | Ready |
