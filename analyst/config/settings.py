@@ -11,13 +11,25 @@ import re
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _MEMORY_PATTERN = re.compile(r"^\d+(\.\d+)?\s?(KB|MB|GB|KiB|MiB|GiB)$", re.IGNORECASE)
 
 Region = Literal["NZ"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+
+
+class ModelPrice(BaseModel):
+    """What one model costs, in US dollars per million tokens."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    input_per_mtok: float = Field(ge=0)
+    output_per_mtok: float = Field(ge=0)
+    cached_input_per_mtok: float | None = Field(
+        default=None, ge=0, description="Price of cached input tokens; the input price if unset"
+    )
 
 
 class Settings(BaseSettings):
@@ -40,6 +52,10 @@ class Settings(BaseSettings):
     llm_model_explain: str | None = None
     llm_timeout_s: float = Field(default=30.0, gt=0, le=300)
     llm_max_retries: int = Field(default=2, ge=0, le=5)
+    # Prices by model name, as JSON, for the cost estimate in the logs. A model with no
+    # entry is logged with cost 0 and ``cost_known`` false. Filled in from the model
+    # comparison spike, because prices change faster than code.
+    llm_prices: dict[str, ModelPrice] = Field(default_factory=dict)
 
     # Upload limits.
     max_upload_mb: int = Field(default=50, gt=0, le=500)
