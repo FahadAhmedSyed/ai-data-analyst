@@ -32,8 +32,8 @@ About 1,200 responses during 2024.
 
 | Original header | SQL name | Type | Notes |
 | --- | --- | --- | --- |
-| Respondent | `respondent_id` | integer | |
-| Submitted | `submitted_at` | timestamp | `dd/mm/yyyy hh:mm` |
+| Respondent ID | `respondent_id` | integer | |
+| Submitted At | `submitted_at` | timestamp | `dd/mm/yyyy hh:mm` |
 | Age group | `age_group` | text | 18-24, 25-34, 35-44, 45-54, 55+ |
 | Channel | `channel` | text | Online, Phone, In store |
 | Satisfaction | `satisfaction` | integer | 1 to 5; 8% missing |
