@@ -40,6 +40,9 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Generator | Each structured output shape; intent column check; clarification gate | Fake LLM |
 | Corrector | Each category; budget exhaustion; Reject never retried | Fake LLM |
 | Grounding | Number formats (1,234.5; 12%; -3.2; 1e3; 1.2 million); identifiers, ordinals and list numbering ignored; rounding half-unit boundaries; percent against fractions; numbers from the question, assumptions, dates, text values and column names allowed; invented and derived numbers caught; key numbers checked against their column; result caveats, empty-result and template answers | Inline, with expected values written by hand |
+| Explainer | Grounded answer returned as written; one regeneration that names the bad numbers and shows the model its own answer; a second failure gives the template; an empty result makes no call; failed, unusable, empty and budget-limited calls fall back with the right reason and keep their cost; spelled-out numbers refused; links, images and addresses removed so data cannot leave in an image address; logs carry no text | Fake LLM |
+| Result digest | Rows shown (50 and 51 rows, 20 sampled, 30 columns); each statistic against a hand calculation; non-finite values; dates, text, boolean and unsummarised columns; the numbers handed to the grounding check | Inline |
+| Explanation prompt | Snapshots of the system prompt and of the user message for a short and a long result; marker forging in the result, assumptions and SQL; statistics and row limits; truncation and hidden-column notes | Fixtures |
 | Charts | Result shape matrix to chart type | Inline |
 | Memory | Window of 3 and turn limit; carried assumptions (answered turns only, no repeats, latest word last, outlive the window, capped); reset clears everything; sessions do not share memory | Inline |
 | Orchestrator | Every path in the question flow diagram, including API failure | Fake LLM |

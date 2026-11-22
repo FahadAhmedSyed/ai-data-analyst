@@ -15,3 +15,5 @@ The explainer returns answer text plus a list of key numbers with the result col
 
 - Zero ungrounded numbers reach users (ADR 0013).
 - Some valid answers may fall back to the template; the fallback rate is tracked in the benchmark.
+- Numbers spelled as words from eleven up are refused by the explainer, because the check cannot read them. Words up to ten are not looked for, so a made-up "three" is a known gap that the prompt's request for digits narrows; the benchmark will show if it matters.
+- The check runs on the text after links, images and addresses are removed from it, so what is checked is what is shown.
