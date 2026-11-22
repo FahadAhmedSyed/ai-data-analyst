@@ -125,7 +125,7 @@ flowchart TB
     N -- no --> T[Regenerate once, then template]
 ```
 
-Budgets per question: 2 correction attempts and 5 LLM calls in total.
+Budgets per question: 2 correction attempts and 5 LLM calls in total, with one call always kept for the explanation.
 
 ## 7. Text-to-SQL details
 
@@ -161,15 +161,27 @@ Rules are listed in [security.md](security.md#sql-validator-rules).
 
 ### Correction (LLM, bounded)
 
-| Category | Retried | Corrector receives |
+`QueryLoop.run` (`analyst/pipeline/query_loop.py`) takes the generator's answer and returns a result or the reason there is none. `Corrector.correct` (`analyst/pipeline/corrector.py`) makes the one call inside it. What is retried is decided by what the validator and the executor said:
+
+| Problem | Retried | Corrector receives |
 | --- | --- | --- |
-| Parse error | Yes | Error position and message |
-| Unknown table or column | Yes | Closest matching column names |
-| Disallowed function | Yes | The function and allowed alternatives |
-| Type mismatch | Yes | Column types involved |
-| Other execution error | Yes | Cleaned error message |
-| Timeout | Once | Request for a simpler query |
-| Destructive or file access | No | Not sent |
+| Validator `correctable`: unknown table or column | Yes | The validator's reason: the name the model wrote and the closest real names |
+| Validator `correctable`: function not on the allowlist | Yes | The function, and the nearest allowed name when one is close |
+| Validator `correctable`: unsupported syntax, too complex | Yes | What syntax, or which limit |
+| The intent names columns that are not in the table | Yes, once, and softly (below) | The names, with the closest real ones |
+| Execution error, type mismatch (`binder`, `conversion`) | Yes | The database's message, and the types of the columns the query uses |
+| Other execution error | Yes | The database's message, cleaned |
+| Timeout or out of memory | Once, for both together | A request for a simpler query |
+| Validator `rejected`: changes data, reads files or the environment, path-like table, several statements, syntax error (V12) | No | Not sent; the turn ends with a safety message |
+
+Whether a query is correctable is the validator's `status`, not its category, so the table follows security.md section 4. The earlier version of this table listed a parse error as retried, but rule V12 rejects it; if V12 is relaxed after real traffic is measured, nothing in the loop changes (`parse_error` already has its request).
+
+- **The call.** The model is shown the conversation the generator started (`Generation.opening`), then its own answer again, then a `PROBLEM` block and a one-line request that depends on the category (`analyst/config/prompts.py`). It answers in the same format as call 1 (`GenerationResult`), so a correction can change the intent and the assumptions as well as the SQL, and the corrected answer is the one the explainer and memory use. A second correction continues the same conversation. Every correction goes back through the validator.
+- **What the block holds.** The validator's reason names only identifiers the model wrote, cut to 40 characters, and never a value. The database's message can quote values and names from the file, so it is flattened, cut to 400 characters and placed in the `PROBLEM` block, which is fenced like the rest of the file's text (security.md section 3). In schema-only mode (ADR 0010) quoted text is removed from it, and for the categories that can echo a cell (`conversion`, `other`) the message is withheld and only the title and the column types are sent.
+- **Limits** (FR-4.4). At most `MAX_CORRECTIONS` corrections per question (2), counting a correction whose answer was unusable; a timeout or out-of-memory failure is corrected once whatever else happened, because a second try only makes the user wait for the same failure; and a call is always left in the question's budget for the explainer (`reserve_calls`, 1), so correcting cannot leave the answer without an explanation.
+- **The intent check is soft.** `Generation.unknown_columns` is sent to the corrector first, before validation, and counts as a correction. It is not sent again after that. If it cannot be corrected (no correction or call left, a failed or unusable call) the query is checked as written, because the validator and the database judge the SQL itself, and a mislabelled intent does not make a good query wrong.
+- **How it ends** (`RunOutcome.status`). `ok` (the rows are in `result`); `rejected` (a safety message); `unfixed` (corrections or the heavy-query allowance used up; the message says what failed when the last failure was a run failure); `budget` (no call to spare); `llm_error` (a correction call failed); `gave_up` (asked to fix the query, the model gave none and said why, and its words, cleaned, are the message). Every message is written from the category and never from the SQL, the validator's reason or the database's message, except `gave_up`, which is the model's own cleaned explanation. The outcome also carries every attempt (query, stage, category), the number of corrections, and the cost of the correction calls, including calls that reached the model and gave an unusable answer.
+- **Logs.** One line per attempt (stage, category, a hash of the SQL) and one per run (status, attempts, corrections, last category), and one per correction call. No SQL, no database message and no model text.
 
 An empty result is not an error. The answer says so and lists the filter values used.
 

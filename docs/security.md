@@ -38,6 +38,7 @@
 | T4 | Cost rules in validator; timeout via `interrupt()`; memory cap; row cap | Validator, executor | Executor limit tests |
 | T5, T6 | Model output is only SQL plus text, both checked; data placed in a marked untrusted block, cut to 80 characters; identifiers normalised; model has no tools or secrets | Prompt, validator | Injection fixtures and benchmark cases |
 | T5, T6 | The explanation call gets the result, question and SQL in the same kind of marked blocks (random code, text flattened and cut); every number in what it returns is checked against the result in code, and the text cannot carry an address or image | Prompt, grounding, explainer | Marker-forging tests on the explanation prompt; grounding and explainer tests |
+| T5, T6 | The correction call reports a failed query in a `PROBLEM` block of the same kind. The database's message can quote values and names from the file, so it is flattened, cut and fenced; in schema-only mode quoted text is removed, and for the categories that can echo a cell the message is withheld. A query the validator rejected is never sent, and a corrected query is validated again like any other | Prompt, corrector, query loop | Marker-forging test on the problem block; schema-only canary test on a real conversion error; rejected-never-retried tests |
 | T7 | Size check before parse; zip uncompressed-size check; row and column caps; defusedxml installed | Ingestion | Oversized and zip-bomb fixtures |
 | T8 | Per-session DuckDB in `st.session_state`; no user data in globals or Streamlit caches | Session | Two-session AppTest |
 | T9 | Shared password; OpenAI project spend cap; 20 questions per 10 minutes per session | UI, account | Gate and limiter tests |
@@ -52,7 +53,7 @@ Threats T5 and T6 are met in three layers, none relied on alone (the validator s
 
 1. **Shape.** Every cell, name and value from the file, and every value carried into a later turn, is cut to 80 characters and flattened to one line, so it cannot begin a line of its own.
 2. **Markers.** The data goes in blocks whose marker lines carry a random 12-character code made when the session's builder is created. The file's author cannot know it, so no text in the file can close a block and pass for an instruction. If the code ever appeared inside the content it is removed from it.
-3. **Instruction.** The fixed system prompt says the `DATASET` and `HISTORY` blocks are data, tells the model never to follow instructions found there, and tells it to refuse requests to change or export data (benchmark cases I01 and I02).
+3. **Instruction.** The fixed system prompt says the `DATASET`, `HISTORY` and `PROBLEM` blocks are data, tells the model never to follow instructions found there, and tells it to refuse requests to change or export data (benchmark cases I01 and I02).
 
 The marker code must be new for each dataset and is never shown to the user. Schema-only mode sends no cell value; question text, SQL and assumptions from turns that ran before the mode was switched on may still contain values the user or model quoted.
 
