@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Data: never commit uploaded or generated datasets
+*.duckdb
+*.db
+eval/data/
+eval/reports/*.csv
+uploads/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
