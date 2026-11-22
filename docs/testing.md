@@ -41,7 +41,7 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Corrector | Each category; budget exhaustion; Reject never retried | Fake LLM |
 | Grounding | Number formats (1,234.5; 12%; -3.2; 1e3); rounding; numbers from the question and assumptions allowed; invented number caught | Inline |
 | Charts | Result shape matrix to chart type | Inline |
-| Memory | Window of 3; reset; replace; carried assumptions | Inline |
+| Memory | Window of 3 and turn limit; carried assumptions (answered turns only, no repeats, latest word last, outlive the window, capped); reset clears everything; sessions do not share memory | Inline |
 | Orchestrator | Every path in the question flow diagram, including API failure | Fake LLM |
 | UI | Password gate; upload then ask; clarification; failure message; reset; replace; rate limit; two-session isolation; HTML in data is not rendered | AppTest |
 

@@ -165,11 +165,13 @@ The explainer receives question, intent, SQL, assumptions and result (all rows i
 
 ## 8. Conversational memory
 
-- Each turn stores question, resolved question, intent, SQL, assumptions, answer and a result summary (columns, row count, up to 20 rows).
-- LLM call 1 sees the last three turns (question, resolved question, intent, SQL) and only the last result summary.
+`ConversationMemory` (`analyst/memory/conversation.py`) is one in-process object per session.
+
+- Each turn stores question, resolved question, intent, SQL, assumptions, answer and a result summary (columns, row count, up to 20 rows). At most 50 turns are kept; the oldest are dropped beyond that.
+- `recent()` returns the last three turns. LLM call 1 sees those (question, resolved question, intent, SQL) and only the most recent result summary.
 - A new question always runs a new query; the explainer sees only the current result.
-- Confirmed assumptions carry forward.
-- Reset clears turns; replacing the dataset clears turns after confirmation.
+- Carried assumptions: the assumptions stated on answered turns are kept for the rest of the session, oldest first, without repeats (a restated one moves to the end), at most the latest eight. A user who sees an assumption and carries on has accepted it; turns that asked for clarification or failed settle nothing and carry nothing. When two carried assumptions conflict, the later one is the one to follow, which is why the order is kept. The orchestrator (T1.17) passes them to the context builder.
+- Reset clears turns and carried assumptions. Replacing the dataset does the same, after the interface has asked for confirmation.
 - No persistence beyond the browser session in the MVP.
 
 ## 9. Charts
