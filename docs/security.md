@@ -53,10 +53,10 @@ Implemented in `analyst/sql/validator.py`. Parsing: `sqlglot.parse(sql, read="du
 | V1 | Exactly one statement | Reject |
 | V2 | Root is SELECT, UNION, INTERSECT, EXCEPT, or WITH ending in one of those | Reject |
 | V3 | No INSERT, UPDATE, DELETE, MERGE, DROP, CREATE, ALTER, TRUNCATE, COPY, ATTACH, DETACH, PRAGMA, SET, RESET, INSTALL, LOAD, EXPORT, IMPORT, CALL, or unparsed `Command` nodes anywhere in the tree | Reject |
-| V4 | Every table reference is a session table or a CTE defined in the same query. SQLGlot's `qualify` does not catch unknown tables, so this explicit check is required (spike note B1) | Correctable for an unknown plain name; Reject for any name containing `/`, `.`, `:` or a schema qualifier |
+| V4 | Every table reference is a session table or a CTE defined in the same query. SQLGlot's `qualify` does not catch unknown tables, so this explicit check is required (spike note B1) | Correctable for an unknown plain identifier; Reject for any other name (note 3) or a schema qualifier |
 | V5 | No system catalogs: `information_schema`, `pg_catalog`, `duckdb_*` functions and views, `sqlite_master` | Reject |
 | V6 | No table functions in FROM: `read_csv*`, `read_parquet`, `read_json*`, `read_text`, `read_blob`, `glob`, `range`, `generate_series`, `parquet_scan` and any other function used as a table | Reject |
-| V7 | Every scalar, aggregate and window function is on the allowlist | Correctable |
+| V7 | Every scalar, aggregate and window function is on the allowlist | Correctable; Reject for functions that read files, the environment, settings or nested SQL (note 5) |
 | V8 | Columns qualify against the session schema (`sqlglot.optimizer.qualify` with the catalog) | Correctable |
 | V9 | No `WITH RECURSIVE` | Correctable |
 | V10 | At most 4 joins; no join without a condition unless both inputs are CTEs or subqueries of 1,000 rows or fewer by LIMIT | Correctable |
@@ -64,6 +64,22 @@ Implemented in `analyst/sql/validator.py`. Parsing: `sqlglot.parse(sql, read="du
 | V12 | Anything SQLGlot cannot parse completely | Reject |
 
 "Reject" ends the turn with a safety message and a warning log. "Correctable" goes to the corrector.
+
+### Implementation notes (T1.08)
+
+How `analyst/sql/validator.py` realises the rules, and where it goes beyond the table above.
+
+1. **Default deny.** Every node in the parsed tree must be a class on an explicit syntax or function list. A construct SQLGlot or DuckDB adds later is blocked until someone allows it, with a test. A node that is on no list gives `disallowed_function` (if it is a function), `forbidden_statement` (if it is a statement class) or `unsupported_syntax` (anything else, for example `PIVOT`, `VALUES`, `LATERAL`, `TABLESAMPLE`, subscripts, query parameters, and `ASOF`, `SEMI` or `ANTI` joins). `unsupported_syntax` is a new category and is correctable.
+2. **What runs is regenerated.** The text sent to DuckDB is generated from the validated tree, with comments removed and V11 applied, not the model's own text. Two checks then back this up: the generated text is parsed and validated again, and DuckDB's own parser (`extract_statements` on a parse-only, locked-down connection) must read it as exactly one `SELECT`. SQLGlot and DuckDB tokenize separately, so this closes the gap where they might disagree about where a statement ends. It also catches text SQLGlot accepts and DuckDB does not (an empty `GROUP BY`).
+3. **V4 names.** An unknown table name is correctable only if it is a plain identifier (`str.isidentifier()`). Anything else (a path, a URL, a name with a space or hyphen) is rejected, as is any name starting with `duckdb_`, `pg_`, `sqlite_`, `pragma_` or `information_schema`, unless it is the session table. Names are compared case-insensitively.
+4. **V6.** Any function used as a table (`read_csv`, `range`, `unnest`, any other) is rejected.
+5. **V7 hardening.** A call to `getenv`, `current_setting`, `getvariable`, `query`, `query_table`, `glob`, `pg_sleep`, `error`, `nextval`, `unnest`, `generate_series`, `range`, or any function whose name starts with `read_`, `write_`, `duckdb_`, `pragma_`, `pg_`, `sqlite_` or `parquet_` is an attack signature, not a slip, so it is **rejected** instead of corrected. Every other function that is not on the allowlist stays correctable, with a nearest-name suggestion when the model's own spelling is close.
+6. **V10 refinement.** A join without a condition (comma join, `CROSS JOIN`, `JOIN` with no `ON` or `USING`, `NATURAL JOIN`) is allowed when both inputs are subqueries or CTEs known to have at most 1,000 rows, or when either input is known to be exactly one row. Row bounds come from a literal `LIMIT`, an aggregate with no `GROUP BY`, a `SELECT` with no `FROM`, or a single bounded input. The single-row case is not in the original rule; it is needed for the common "compare each row with the overall average" pattern (`... CROSS JOIN (SELECT AVG(x) FROM t)`), where the result is no larger than the table. A CTE that shares its name with the session table or with another CTE has no known size. Only plain `INNER`, `LEFT`, `RIGHT`, `FULL` and `CROSS` joins are accepted. The join count includes joins inside subqueries and CTEs.
+7. **Size limits** (correctable `too_complex`): 10,000 characters, 2,000 tree nodes, nesting depth 40. Input that overflows the parser's recursion limit is rejected.
+8. **Several problems at once.** The most serious finding is reported: refusals before corrections, then unknown table, function, syntax, size and column, in that order.
+9. **V12.** A syntax error is a refusal, as the table says. Ordinary syntax slips are probably the commonest model mistake, and nothing runs when one occurs, so making plain syntax errors correctable is worth reviewing once real traffic is measured. Statements SQLGlot cannot parse at all (`EXPORT DATABASE`, `IMPORT DATABASE`) are refused as `parse_error`.
+10. **Allowlist spelling.** The list is keyed on SQLGlot classes, so a few spellings of an allowlisted function come with it: `ceiling`, `substr`, `len`, `ucase`, `lcase`, `array_agg`, `percentile_cont`, `datetrunc`, `group_concat`, `log2`. SQLGlot also turns spellings that DuckDB lacks into DuckDB ones (`nvl` becomes `COALESCE`), so such a query runs where the original text would not. The allowlist test checks the names above against this document, so the two cannot drift apart.
+11. **Logs.** A refusal logs its category, a reason built from short identifiers, and a hash of the SQL. The SQL itself is never logged (T10). SQLGlot's own logger is silenced because it prints the statement when it falls back to an unparsed `Command`.
 
 ### Function allowlist (initial)
 

@@ -87,6 +87,7 @@ ValidationCategory = Literal[
     "table_function",
     "disallowed_function",
     "unknown_column",
+    "unsupported_syntax",
     "too_complex",
 ]
 

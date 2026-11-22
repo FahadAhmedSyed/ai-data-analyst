@@ -1,0 +1,744 @@
+# SQL validator corpus (T1.08). Run by tests/unit/test_validator.py against one table:
+#   sales(order_id, order_date, region, product, category, quantity, unit_price, revenue, customer_id)
+#
+# adversarial: every case must be refused, with the stated verdict ("status/category").
+#   rejected    = the turn ends with a safety message
+#   correctable = the reason goes back to the corrector
+# valid: every case must be accepted, and the validated text must return the same rows as the
+#   original on the synthetic sales table.
+#
+# Expected verdicts are written from the rules in docs/security.md section 4, not copied from
+# the validator's output.
+
+adversarial:
+  # ---- V1: exactly one statement ------------------------------------------------------
+  - id: A001
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT 1; SELECT 2
+  - id: A002
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT * FROM sales; DROP TABLE sales
+  - id: A003
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT * FROM sales WHERE region = 'x'; DROP TABLE sales; --'
+  - id: A004
+    why: A backslash does not escape a quote in DuckDB, so the string ends and a second statement starts.
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT 'a\'; DROP TABLE sales; --'
+  - id: A005
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT 1;; DROP TABLE sales
+  - id: A006
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT 1; ATTACH 'evil.db'
+  - id: A007
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT * FROM sales; COPY sales TO '/tmp/out.csv'
+  - id: A008
+    expect: rejected/multiple_statements
+    sql: |-
+      WITH t AS (SELECT 1) SELECT * FROM t; SELECT * FROM sales
+  - id: A009
+    expect: rejected/multiple_statements
+    sql: |-
+      SELECT "a\"; DROP TABLE sales; --" FROM sales
+
+  # ---- V2 and V3: only SELECT; no DDL, DML or administration -------------------------------
+  - id: A010
+    expect: rejected/forbidden_statement
+    sql: DROP TABLE sales
+  - id: A011
+    expect: rejected/forbidden_statement
+    sql: DELETE FROM sales
+  - id: A012
+    expect: rejected/forbidden_statement
+    sql: UPDATE sales SET revenue = 0
+  - id: A013
+    expect: rejected/forbidden_statement
+    sql: INSERT INTO sales SELECT * FROM sales
+  - id: A014
+    expect: rejected/forbidden_statement
+    sql: CREATE TABLE copy AS SELECT * FROM sales
+  - id: A015
+    expect: rejected/forbidden_statement
+    sql: CREATE VIEW v AS SELECT * FROM sales
+  - id: A016
+    expect: rejected/forbidden_statement
+    sql: ALTER TABLE sales ADD COLUMN x INTEGER
+  - id: A017
+    expect: rejected/forbidden_statement
+    sql: TRUNCATE TABLE sales
+  - id: A018
+    expect: rejected/forbidden_statement
+    sql: COPY sales TO '/tmp/out.csv'
+  - id: A019
+    expect: rejected/forbidden_statement
+    sql: COPY (SELECT * FROM sales) TO '/tmp/out.csv' (FORMAT csv)
+  - id: A020
+    expect: rejected/forbidden_statement
+    sql: ATTACH 'evil.db' AS evil
+  - id: A021
+    expect: rejected/forbidden_statement
+    sql: DETACH evil
+  - id: A022
+    expect: rejected/forbidden_statement
+    sql: PRAGMA database_list
+  - id: A023
+    expect: rejected/forbidden_statement
+    sql: SET memory_limit = '100GB'
+  - id: A024
+    expect: rejected/forbidden_statement
+    sql: SET enable_external_access = true
+  - id: A025
+    expect: rejected/forbidden_statement
+    sql: RESET memory_limit
+  - id: A026
+    expect: rejected/forbidden_statement
+    sql: INSTALL httpfs
+  - id: A027
+    expect: rejected/forbidden_statement
+    sql: LOAD httpfs
+  - id: A028
+    why: SQLGlot cannot parse this DuckDB statement; V12 refuses what it cannot parse.
+    expect: rejected/parse_error
+    sql: EXPORT DATABASE '/tmp/dump'
+  - id: A029
+    why: SQLGlot cannot parse this DuckDB statement; V12 refuses what it cannot parse.
+    expect: rejected/parse_error
+    sql: IMPORT DATABASE '/tmp/dump'
+  - id: A030
+    expect: rejected/forbidden_statement
+    sql: CALL pragma_version()
+  - id: A031
+    why: DuckDB-specific statements SQLGlot returns as an unparsed Command node.
+    expect: rejected/forbidden_statement
+    sql: EXPLAIN SELECT * FROM sales
+  - id: A032
+    expect: rejected/forbidden_statement
+    sql: DESCRIBE sales
+  - id: A033
+    expect: rejected/forbidden_statement
+    sql: SHOW TABLES
+  - id: A034
+    expect: rejected/forbidden_statement
+    sql: SUMMARIZE sales
+  - id: A035
+    expect: rejected/forbidden_statement
+    sql: MERGE INTO sales USING sales s2 ON sales.order_id = s2.order_id WHEN MATCHED THEN DELETE
+  - id: A036
+    expect: rejected/forbidden_statement
+    sql: SELECT * INTO copy FROM sales
+  - id: A037
+    expect: rejected/forbidden_statement
+    sql: BEGIN TRANSACTION
+  - id: A038
+    expect: rejected/forbidden_statement
+    sql: USE memory
+  - id: A039
+    expect: rejected/forbidden_statement
+    sql: VACUUM
+  - id: A040
+    expect: rejected/forbidden_statement
+    sql: CHECKPOINT
+
+  # ---- V4 and V5: tables must be session tables; no paths, schemas or system catalogs -------
+  - id: A050
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM '/etc/passwd'
+  - id: A051
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM 'data.csv'
+  - id: A052
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM "report.parquet"
+  - id: A053
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM 'https://example.com/data.csv'
+  - id: A054
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM 's3://bucket/data.parquet'
+  - id: A055
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM 'C:\Users\victim\secrets.csv'
+  - id: A056
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM '../../etc/shadow'
+  - id: A057
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM information_schema.tables
+  - id: A058
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM information_schema.columns
+  - id: A059
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM pg_catalog.pg_tables
+  - id: A060
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM main.sales
+  - id: A061
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM memory.main.sales
+  - id: A062
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM system.main.sales
+  - id: A063
+    why: Views DuckDB exposes without a schema.
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM sqlite_master
+  - id: A064
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM duckdb_tables
+  - id: A065
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM duckdb_settings
+  - id: A066
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM pg_tables
+  - id: A067
+    why: A file name written as table.extension parses as a schema-qualified table.
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM sales.csv
+  - id: A068
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM "my table"
+  - id: A069
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM sales JOIN '/etc/passwd' ON 1 = 1
+  - id: A070
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM (SELECT * FROM '/etc/passwd') t
+  - id: A071
+    expect: rejected/forbidden_table
+    sql: WITH t AS (SELECT * FROM information_schema.tables) SELECT * FROM t
+  - id: A072
+    expect: rejected/forbidden_table
+    sql: SELECT (SELECT COUNT(*) FROM information_schema.tables) AS n
+  - id: A073
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM sales WHERE order_id IN (SELECT 1 FROM '/etc/passwd')
+  - id: A074
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM sales UNION ALL SELECT * FROM 'x.csv'
+  - id: A075
+    expect: rejected/forbidden_table
+    sql: SELECT * FROM sales WHERE EXISTS (SELECT 1 FROM main.sales)
+
+  # ---- V6: no table functions ------------------------------------------------------------
+  - id: A080
+    expect: rejected/table_function
+    sql: SELECT * FROM read_csv('/etc/passwd')
+  - id: A081
+    expect: rejected/table_function
+    sql: SELECT * FROM read_csv_auto('data.csv')
+  - id: A082
+    expect: rejected/table_function
+    sql: SELECT * FROM read_parquet('data.parquet')
+  - id: A083
+    expect: rejected/table_function
+    sql: SELECT * FROM read_json('data.json')
+  - id: A084
+    expect: rejected/table_function
+    sql: SELECT * FROM read_text('/proc/self/environ')
+  - id: A085
+    expect: rejected/table_function
+    sql: SELECT * FROM read_blob('/etc/passwd')
+  - id: A086
+    expect: rejected/table_function
+    sql: SELECT * FROM glob('/*')
+  - id: A087
+    expect: rejected/table_function
+    sql: SELECT * FROM range(1000000000)
+  - id: A088
+    expect: rejected/table_function
+    sql: SELECT * FROM generate_series(1, 1000000000)
+  - id: A089
+    expect: rejected/table_function
+    sql: SELECT * FROM parquet_scan('data.parquet')
+  - id: A090
+    expect: rejected/table_function
+    sql: SELECT * FROM duckdb_settings()
+  - id: A091
+    expect: rejected/table_function
+    sql: SELECT * FROM duckdb_tables()
+  - id: A092
+    expect: rejected/table_function
+    sql: SELECT * FROM pragma_database_list()
+  - id: A093
+    expect: rejected/table_function
+    sql: SELECT * FROM unnest([1, 2, 3])
+  - id: A094
+    expect: rejected/table_function
+    sql: SELECT * FROM sales, read_csv('x.csv')
+  - id: A095
+    expect: rejected/table_function
+    sql: SELECT * FROM sales CROSS JOIN read_text('/etc/passwd')
+  - id: A096
+    expect: rejected/table_function
+    sql: SELECT * FROM query('SELECT 1')
+  - id: A097
+    expect: rejected/table_function
+    sql: SELECT * FROM sniff_csv('x.csv')
+  - id: A098
+    expect: rejected/table_function
+    sql: WITH t AS (SELECT * FROM read_csv('/etc/passwd')) SELECT * FROM t
+  - id: A099
+    expect: rejected/table_function
+    sql: SELECT * FROM sales WHERE order_id IN (SELECT column0 FROM read_csv('x.csv'))
+
+  # ---- V7: dangerous functions are refused outright --------------------------------------
+  - id: A110
+    expect: rejected/disallowed_function
+    sql: SELECT getenv('OPENAI_API_KEY')
+  - id: A111
+    expect: rejected/disallowed_function
+    sql: SELECT current_setting('memory_limit')
+  - id: A112
+    expect: rejected/disallowed_function
+    sql: SELECT read_text('/etc/passwd')
+  - id: A113
+    expect: rejected/disallowed_function
+    sql: SELECT * FROM sales WHERE region = getenv('HOME')
+  - id: A114
+    expect: rejected/disallowed_function
+    sql: SELECT pg_sleep(60)
+  - id: A115
+    expect: rejected/disallowed_function
+    sql: SELECT error('boom')
+  - id: A116
+    expect: rejected/disallowed_function
+    sql: SELECT nextval('seq')
+  - id: A117
+    expect: rejected/disallowed_function
+    sql: SELECT query('SELECT * FROM sales')
+  - id: A118
+    expect: rejected/disallowed_function
+    sql: SELECT getvariable('x')
+  - id: A119
+    expect: rejected/disallowed_function
+    sql: SELECT glob('/*')
+  - id: A120
+    expect: rejected/disallowed_function
+    sql: SELECT unnest(range(1000000000))
+  - id: A121
+    expect: rejected/disallowed_function
+    sql: WITH t AS (SELECT getenv('HOME') AS h) SELECT * FROM t
+  - id: A122
+    expect: rejected/disallowed_function
+    sql: SELECT region FROM sales GROUP BY region HAVING getenv('X') = 'y'
+  - id: A123
+    expect: rejected/disallowed_function
+    sql: SELECT write_csv('x')
+  - id: A124
+    expect: rejected/disallowed_function
+    sql: SELECT duckdb_version()
+  - id: A125
+    expect: rejected/disallowed_function
+    sql: SELECT current_setting('x'), getenv('y')
+
+  # ---- V7: other functions off the allowlist go back to the corrector ----------------------
+  - id: A130
+    expect: correctable/disallowed_function
+    sql: SELECT random() FROM sales
+  - id: A131
+    expect: correctable/disallowed_function
+    sql: SELECT uuid() FROM sales
+  - id: A132
+    expect: correctable/disallowed_function
+    sql: SELECT regexp_replace(region, 'a', 'b') FROM sales
+  - id: A133
+    expect: correctable/disallowed_function
+    sql: SELECT now()
+  - id: A134
+    expect: correctable/disallowed_function
+    sql: SELECT current_timestamp
+  - id: A135
+    expect: correctable/disallowed_function
+    sql: SELECT repeat('a', 1000000000)
+  - id: A136
+    expect: correctable/disallowed_function
+    sql: SELECT md5(region) FROM sales
+  - id: A137
+    expect: correctable/disallowed_function
+    sql: SELECT hash(region) FROM sales
+  - id: A138
+    expect: correctable/disallowed_function
+    sql: SELECT typeof(revenue) FROM sales
+  - id: A139
+    expect: correctable/disallowed_function
+    sql: SELECT any_value(region) FROM sales
+  - id: A140
+    expect: correctable/disallowed_function
+    sql: SELECT list_transform(region, x -> x) FROM sales
+  - id: A141
+    expect: correctable/disallowed_function
+    sql: SELECT json_extract(region, '$.a') FROM sales
+  - id: A142
+    expect: correctable/disallowed_function
+    sql: SELECT approx_quantile(revenue, 0.5) FROM sales
+  - id: A143
+    expect: correctable/disallowed_function
+    sql: SELECT skewness(revenue) FROM sales
+  - id: A144
+    expect: correctable/disallowed_function
+    sql: SELECT strlen(region) FROM sales
+  - id: A145
+    expect: correctable/disallowed_function
+    sql: SELECT version()
+  - id: A146
+    expect: correctable/disallowed_function
+    sql: SELECT my_udf(revenue) FROM sales
+
+  # ---- V4: unknown plain table names are correctable -----------------------------------------
+  - id: A150
+    expect: correctable/unknown_table
+    sql: SELECT * FROM weather
+  - id: A151
+    expect: correctable/unknown_table
+    sql: SELECT * FROM orders
+  - id: A152
+    expect: correctable/unknown_table
+    sql: SELECT * FROM sales s JOIN customers c ON s.customer_id = c.id
+  - id: A153
+    expect: correctable/unknown_table
+    sql: WITH t AS (SELECT * FROM missing) SELECT * FROM t
+  - id: A154
+    why: A CTE is visible only inside its own query.
+    expect: correctable/unknown_table
+    sql: SELECT * FROM t
+
+  # ---- V8: unknown columns are correctable ----------------------------------------------------
+  - id: A160
+    expect: correctable/unknown_column
+    sql: SELECT nope FROM sales
+  - id: A161
+    expect: correctable/unknown_column
+    sql: SELECT revenu FROM sales
+  - id: A162
+    expect: correctable/unknown_column
+    sql: SELECT region FROM sales WHERE nope > 1
+  - id: A163
+    expect: correctable/unknown_column
+    sql: SELECT region, COUNT(*) FROM sales GROUP BY nope
+  - id: A164
+    expect: correctable/unknown_column
+    sql: SELECT region FROM sales ORDER BY nope
+  - id: A165
+    expect: correctable/unknown_column
+    sql: SELECT s.nope FROM sales s
+  - id: A166
+    expect: correctable/unknown_column
+    sql: SELECT t.region FROM sales s
+  - id: A167
+    expect: correctable/unknown_column
+    sql: WITH t AS (SELECT region FROM sales) SELECT revenue FROM t
+  - id: A168
+    expect: correctable/unknown_column
+    sql: SELECT * FROM (SELECT region FROM sales) t WHERE revenue > 1
+  - id: A169
+    expect: correctable/unknown_column
+    sql: SELECT SUM(nope) FROM sales
+  - id: A170
+    why: Ambiguous reference, which DuckDB also refuses.
+    expect: correctable/unknown_column
+    sql: SELECT region FROM sales s1 JOIN sales s2 ON s1.order_id = s2.order_id
+  - id: A171
+    expect: correctable/unknown_column
+    sql: SELECT customer FROM sales
+
+  # ---- Syntax that is not on the allowlist ------------------------------------------------------
+  - id: A180
+    expect: correctable/unsupported_syntax
+    sql: SELECT * FROM sales PIVOT (SUM(revenue) FOR region IN ('North', 'South'))
+  - id: A181
+    expect: correctable/unsupported_syntax
+    sql: SELECT * FROM (VALUES (1), (2)) v(a)
+  - id: A182
+    expect: correctable/unsupported_syntax
+    sql: SELECT * FROM sales TABLESAMPLE (10 PERCENT)
+  - id: A183
+    why: SQLGlot models list and struct literals as functions, which are not on the allowlist.
+    expect: correctable/disallowed_function
+    sql: SELECT [1, 2, 3] FROM sales
+  - id: A184
+    why: SQLGlot models list and struct literals as functions, which are not on the allowlist.
+    expect: correctable/disallowed_function
+    sql: |-
+      SELECT {'a': 1} FROM sales
+  - id: A185
+    expect: correctable/unsupported_syntax
+    sql: SELECT region[1] FROM sales
+  - id: A186
+    expect: correctable/unsupported_syntax
+    sql: SELECT $1 FROM sales
+  - id: A187
+    expect: correctable/unsupported_syntax
+    sql: SELECT ? FROM sales
+  - id: A188
+    expect: correctable/unsupported_syntax
+    sql: SELECT * FROM sales ASOF JOIN sales s2 ON sales.order_date >= s2.order_date
+  - id: A189
+    expect: correctable/unsupported_syntax
+    sql: SELECT * FROM sales SEMI JOIN sales s2 ON sales.order_id = s2.order_id
+  - id: A190
+    expect: correctable/unsupported_syntax
+    sql: SELECT region, SUM(revenue) FROM sales GROUP BY ROLLUP (region)
+  - id: A191
+    expect: correctable/unsupported_syntax
+    sql: SELECT * FROM sales, LATERAL (SELECT 1) t
+
+  # ---- V9 and V10: cost rules -------------------------------------------------------------------
+  - id: A200
+    expect: correctable/too_complex
+    sql: WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r) SELECT * FROM r
+  - id: A201
+    expect: correctable/too_complex
+    sql: SELECT * FROM sales a JOIN sales b ON a.order_id = b.order_id JOIN sales c ON a.order_id = c.order_id JOIN sales d ON a.order_id = d.order_id JOIN sales e ON a.order_id = e.order_id JOIN sales f ON a.order_id = f.order_id
+  - id: A202
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM sales a CROSS JOIN sales b
+  - id: A203
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM sales a, sales b
+  - id: A204
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM sales a JOIN sales b
+  - id: A205
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM sales a NATURAL JOIN sales b
+  - id: A206
+    why: A one-row side is fine, but the other side is bounded only by a large LIMIT.
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM (SELECT * FROM sales LIMIT 5000) a CROSS JOIN (SELECT * FROM sales LIMIT 5000) b
+  - id: A207
+    why: Two grouped subqueries have no known size bound.
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM (SELECT region FROM sales GROUP BY region) a CROSS JOIN (SELECT product FROM sales GROUP BY product) b
+  - id: A208
+    why: A CTE that shadows the session table has no known size.
+    expect: correctable/too_complex
+    sql: WITH sales AS (SELECT 1 AS order_id) SELECT COUNT(*) FROM sales a, sales b
+  - id: A209
+    why: One of two CTEs with the same name is unbounded, so neither is trusted.
+    expect: correctable/too_complex
+    sql: SELECT COUNT(*) FROM (WITH t AS (SELECT 1 AS x) SELECT * FROM t) a CROSS JOIN (WITH t AS (SELECT * FROM sales) SELECT * FROM t) b
+
+  # ---- V12 and malformed input -----------------------------------------------------------------
+  - id: A220
+    expect: rejected/parse_error
+    sql: ""
+  - id: A221
+    expect: rejected/parse_error
+    sql: "   \n\t  "
+  - id: A222
+    expect: rejected/parse_error
+    sql: ";"
+  - id: A223
+    expect: rejected/parse_error
+    sql: -- only a comment
+  - id: A224
+    expect: rejected/parse_error
+    sql: /* only a comment */
+  - id: A225
+    expect: rejected/parse_error
+    sql: SELEC * FROM sales
+  - id: A226
+    expect: rejected/parse_error
+    sql: SELECT * FROM
+  - id: A227
+    expect: rejected/parse_error
+    sql: SELECT (1 FROM sales
+  - id: A228
+    expect: rejected/parse_error
+    sql: SELECT 1 +
+  - id: A229
+    expect: rejected/parse_error
+    sql: SELECT 'unterminated FROM sales
+  - id: A230
+    expect: rejected/parse_error
+    sql: "SELECT 1\0; DROP TABLE sales"
+  - id: A231
+    expect: rejected/parse_error
+    sql: This is not SQL at all.
+  - id: A232
+    expect: rejected/parse_error
+    sql: SELECT * FROM sales WHERE
+  - id: A233
+    why: SQLGlot accepts an empty GROUP BY; DuckDB's own parser does not.
+    expect: rejected/parse_error
+    sql: SELECT * FROM sales GROUP BY
+
+  # ---- Several problems at once: the more serious verdict wins -----------------------------------
+  - id: A240
+    why: Unknown column plus a file read.
+    expect: rejected/table_function
+    sql: SELECT nope FROM read_csv('x.csv')
+  - id: A241
+    why: Unknown table plus a dangerous function.
+    expect: rejected/disallowed_function
+    sql: SELECT getenv('X') FROM weather
+  - id: A242
+    why: Unsupported syntax plus a system table.
+    expect: rejected/forbidden_table
+    sql: SELECT [1] FROM information_schema.tables
+  - id: A243
+    why: Unknown function plus an unknown table; the table is reported first.
+    expect: correctable/unknown_table
+    sql: SELECT random() FROM weather
+
+valid:
+  # ---- Plain aggregation and filtering -------------------------------------------------------------
+  - id: V001
+    sql: SELECT COUNT(*) AS orders FROM sales
+  - id: V002
+    sql: SELECT region, SUM(revenue) AS total FROM sales GROUP BY region ORDER BY total DESC
+  - id: V003
+    sql: SELECT category, AVG(unit_price) FROM sales WHERE region IS NOT NULL GROUP BY 1 ORDER BY 1
+  - id: V004
+    sql: SELECT region, COUNT(DISTINCT customer_id) AS customers FROM sales GROUP BY region HAVING COUNT(*) > 10 ORDER BY 1
+  - id: V005
+    sql: SELECT DISTINCT category FROM sales ORDER BY category
+  - id: V006
+    sql: SELECT order_id, revenue FROM sales ORDER BY revenue DESC, order_id LIMIT 10 OFFSET 5
+  - id: V007
+    sql: SELECT region, SUM(revenue) FROM sales GROUP BY ALL ORDER BY ALL
+  - id: V008
+    sql: SELECT * EXCLUDE (customer_id, product) FROM sales WHERE order_id < 20
+  - id: V009
+    sql: FROM sales SELECT region, COUNT(*) GROUP BY region
+  - id: V010
+    sql: SELECT region, SUM(revenue) FILTER (WHERE category = 'Office') AS office FROM sales GROUP BY region
+  - id: V011
+    sql: SELECT COUNT_IF(revenue > 500) AS big, STRING_AGG(DISTINCT category, ', ') AS cats FROM sales
+
+  # ---- Dates -------------------------------------------------------------------------------------------
+  - id: V020
+    sql: SELECT date_trunc('month', order_date) AS month, SUM(revenue) FROM sales GROUP BY month ORDER BY month
+  - id: V021
+    sql: SELECT strftime(order_date, '%Y-%m') AS ym, COUNT(*) FROM sales GROUP BY ym ORDER BY ym
+  - id: V022
+    sql: SELECT EXTRACT(year FROM order_date) AS y, COUNT(*) FROM sales GROUP BY y ORDER BY y
+  - id: V023
+    sql: SELECT year(order_date) AS y, quarter(order_date) AS q, SUM(revenue) FROM sales GROUP BY y, q ORDER BY y, q
+  - id: V024
+    sql: SELECT COUNT(*) FROM sales WHERE order_date >= DATE '2024-01-01' AND order_date < DATE '2024-04-01'
+  - id: V025
+    sql: SELECT COUNT(*) FROM sales WHERE order_date > (SELECT MAX(order_date) FROM sales) - INTERVAL 30 DAY
+  - id: V026
+    sql: SELECT date_diff('day', MIN(order_date), MAX(order_date)) AS span, age(MAX(order_date), MIN(order_date)) AS span_age FROM sales
+  - id: V027
+    sql: SELECT order_date + INTERVAL 7 DAY AS due FROM sales WHERE order_id <= 5 ORDER BY order_id
+  - id: V028
+    sql: SELECT dayofweek(order_date) AS dow, COUNT(*) FROM sales GROUP BY dow ORDER BY dow
+  - id: V029
+    sql: SELECT last_day(order_date) AS month_end, make_date(2024, 1, 1) AS start FROM sales WHERE order_id = 1
+
+  # ---- Windows, CTEs, subqueries, set operations ------------------------------------------------------
+  - id: V030
+    sql: SELECT order_id, SUM(revenue) OVER (PARTITION BY region ORDER BY order_date, order_id) AS running FROM sales
+  - id: V031
+    sql: SELECT * FROM sales QUALIFY ROW_NUMBER() OVER (PARTITION BY region ORDER BY revenue DESC, order_id) = 1
+  - id: V032
+    sql: WITH m AS (SELECT date_trunc('month', order_date) AS m, SUM(revenue) AS r FROM sales GROUP BY 1) SELECT m, r, r - LAG(r) OVER (ORDER BY m) AS change FROM m ORDER BY m
+  - id: V033
+    sql: WITH a AS (SELECT region, SUM(revenue) AS r FROM sales GROUP BY region), b AS (SELECT region, r FROM a WHERE r > 0) SELECT * FROM b ORDER BY region
+  - id: V034
+    sql: SELECT region, rev FROM (SELECT region, SUM(revenue) AS rev FROM sales GROUP BY region) t WHERE rev > 100 ORDER BY region
+  - id: V035
+    sql: SELECT order_id FROM sales WHERE revenue > (SELECT AVG(revenue) FROM sales) ORDER BY order_id
+  - id: V036
+    sql: SELECT order_id FROM sales WHERE customer_id IN (SELECT customer_id FROM sales GROUP BY customer_id HAVING COUNT(*) > 1) ORDER BY order_id
+  - id: V037
+    sql: SELECT order_id FROM sales s WHERE EXISTS (SELECT 1 FROM sales t WHERE t.customer_id = s.customer_id AND t.order_id <> s.order_id) ORDER BY order_id
+  - id: V038
+    sql: SELECT region FROM sales UNION SELECT product FROM sales
+  - id: V039
+    sql: SELECT category FROM sales INTERSECT SELECT category FROM sales WHERE quantity > 3
+  - id: V040
+    sql: SELECT customer_id FROM sales EXCEPT SELECT customer_id FROM sales WHERE region = 'North'
+  - id: V041
+    sql: (SELECT region FROM sales) UNION ALL (SELECT category FROM sales)
+  - id: V042
+    sql: SELECT AVG(revenue) OVER (ORDER BY order_date, order_id ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS roll FROM sales
+  - id: V043
+    sql: SELECT row_number() OVER w AS rn, region FROM sales WINDOW w AS (PARTITION BY region ORDER BY order_id)
+  - id: V044
+    sql: SELECT region, product, SUM(revenue) AS r, RANK() OVER (PARTITION BY region ORDER BY SUM(revenue) DESC) AS rk FROM sales GROUP BY 1, 2
+  - id: V045
+    sql: SELECT NTILE(4) OVER (ORDER BY revenue, order_id) AS quartile, FIRST_VALUE(revenue) OVER (ORDER BY order_id) AS f FROM sales
+  - id: V046
+    sql: SELECT lead(revenue, 1) OVER (ORDER BY order_id) AS nxt, lag(revenue, 2, 0) OVER (ORDER BY order_id) AS prv FROM sales
+
+  # ---- Joins ----------------------------------------------------------------------------------------------
+  - id: V050
+    sql: SELECT a.region, COUNT(*) FROM sales a JOIN sales b ON a.customer_id = b.customer_id AND a.order_id < b.order_id GROUP BY 1 ORDER BY 1
+  - id: V051
+    sql: SELECT a.region, b.rev FROM sales a JOIN (SELECT region, SUM(revenue) AS rev FROM sales GROUP BY 1) b USING (region) WHERE a.order_id < 30
+  - id: V052
+    sql: SELECT s.order_id, s.revenue - t.avg_rev AS diff FROM sales s CROSS JOIN (SELECT AVG(revenue) AS avg_rev FROM sales) t
+  - id: V053
+    sql: WITH t AS (SELECT AVG(revenue) AS avg_rev FROM sales) SELECT s.order_id, t.avg_rev FROM sales s, t
+  - id: V054
+    sql: SELECT a.x, b.y FROM (SELECT region AS x FROM sales GROUP BY region LIMIT 10) a CROSS JOIN (SELECT product AS y FROM sales GROUP BY product LIMIT 20) b
+  - id: V055
+    sql: SELECT COUNT(*) FROM sales a LEFT JOIN sales b ON a.order_id = b.order_id LEFT JOIN sales c ON a.order_id = c.order_id LEFT JOIN sales d ON a.order_id = d.order_id LEFT JOIN sales e ON a.order_id = e.order_id
+  - id: V056
+    sql: SELECT COUNT(*) FROM sales a FULL OUTER JOIN sales b ON a.order_id = b.order_id + 1
+
+  # ---- Expressions ------------------------------------------------------------------------------------------
+  - id: V060
+    sql: SELECT CASE WHEN revenue > 1000 THEN 'high' WHEN revenue > 500 THEN 'mid' ELSE 'low' END AS band, COUNT(*) FROM sales GROUP BY 1 ORDER BY 1
+  - id: V061
+    sql: SELECT COALESCE(region, 'unknown') AS r, NULLIF(quantity, 1) AS q, IFNULL(revenue, 0) AS v FROM sales WHERE order_id < 30
+  - id: V062
+    sql: SELECT order_id FROM sales WHERE region LIKE 'N%' AND product ILIKE '%1%' AND quantity BETWEEN 2 AND 5 AND category IN ('Office', 'Furniture')
+  - id: V063
+    sql: SELECT CAST(quantity AS DOUBLE) AS q, unit_price::INTEGER AS p, TRY_CAST(product AS INTEGER) AS bad FROM sales WHERE order_id < 10
+  - id: V064
+    sql: SELECT MEDIAN(revenue) AS med, QUANTILE_CONT(revenue, 0.9) AS p90, STDDEV(revenue) AS sd, CORR(unit_price, quantity) AS c FROM sales
+  - id: V065
+    sql: SELECT UPPER(region) AS r, LENGTH(product) AS n, SUBSTRING(product, 1, 3) AS s, product || '-' || category AS pc, SPLIT_PART(product, ' ', 2) AS num FROM sales WHERE order_id < 10
+  - id: V066
+    sql: SELECT revenue / NULLIF(quantity, 0) AS per_unit, quantity % 2 AS parity, -revenue AS neg, POWER(quantity, 2) AS sq, ROUND(unit_price, 1) AS rp FROM sales WHERE order_id < 10
+  - id: V067
+    sql: SELECT GREATEST(quantity, 3) AS g, LEAST(quantity, 3) AS l, ABS(quantity - 4) AS a, SQRT(quantity) AS s, LN(quantity) AS ln, EXP(0) AS e, FLOOR(unit_price) AS fl, CEIL(unit_price) AS ce, SIGN(quantity - 3) AS sg FROM sales WHERE order_id < 10
+  - id: V068
+    sql: SELECT region AS "Sales region", SUM(revenue) AS "Total ($)" FROM sales GROUP BY region
+  - id: V069
+    sql: SELECT COUNT(*) FROM sales WHERE region = 'it''s' OR product = 'a;b' OR product = 'x--y'
+  - id: V070
+    sql: SELECT revenue * 2 AS double_rev FROM sales WHERE double_rev > 1000 ORDER BY order_id
+  - id: V071
+    sql: SELECT quantity > 3 AS big, region IS NULL AS missing, NOT (quantity > 3) AS small FROM sales WHERE order_id < 10
+  - id: V072
+    sql: SELECT ARG_MAX(product, revenue) AS top, ARG_MIN(product, revenue) AS bottom, MODE(category) AS common FROM sales
+
+  # ---- Spelling, wrapping and comments -------------------------------------------------------------------------
+  - id: V080
+    sql: select count(*) from SALES
+  - id: V081
+    sql: SELECT COUNT(*) FROM "sales"
+  - id: V082
+    sql: SELECT COUNT(*) FROM sales;
+  - id: V083
+    sql: (SELECT COUNT(*) FROM sales)
+  - id: V084
+    sql: SELECT 1 AS one
+  - id: V085
+    why: Comments are dropped from the text that runs.
+    sql: |-
+      SELECT COUNT(*) /* ; DROP TABLE sales */ FROM sales -- ; DROP TABLE sales
+  - id: V086
+    sql: |-
+      SELECT
+          region,
+          SUM(revenue) AS total
+      FROM sales
+      GROUP BY region
+      ORDER BY region
