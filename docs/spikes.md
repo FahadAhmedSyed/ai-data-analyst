@@ -40,6 +40,8 @@ After loading a table and applying the six lockdown settings from [security.md](
 
 **Design note A1.** DuckDB has no read-only mode for in-memory databases, so DML and DDL are stopped only by the validator (rules V2 and V3). Impact is limited to the user's own session. Added safeguard for T1.06: after each query the executor checks that the catalog (table names and row count) is unchanged; if not, the session is marked corrupted, an error is logged, and the user is asked to reload the file.
 
+**Follow-up found in T1.06.** The spike memory test (`OutOfMemoryException` with a 100 MB cap) did not check what DuckDB writes to disk. It spills to a `.tmp` directory even with `enable_external_access = false`; `SET temp_directory = ''` (applied before external access is switched off) stops it. See [security.md](security.md#5-duckdb-lockdown).
+
 ## (b) SQLGlot validation signals
 
 Twenty test queries were parsed with `sqlglot.parse(sql, read="duckdb")`.

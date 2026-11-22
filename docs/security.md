@@ -79,28 +79,40 @@ Grown deliberately, one test per addition.
 
 ## 5. DuckDB lockdown
 
-Applied in `analyst/database/session_db.py` after the table is loaded:
+Applied in `analyst/database/session_db.py` after the table is loaded, in this order:
 
 ```sql
+SET temp_directory = '';
 SET enable_external_access = false;
 SET autoinstall_known_extensions = false;
 SET autoload_known_extensions = false;
+SET allow_community_extensions = false;
+SET python_enable_replacements = false;
 SET memory_limit = '1GB';
 SET threads = 2;
 SET lock_configuration = true;
 ```
 
-Verification tests (each must raise an error after lockdown, on the pinned DuckDB version):
+Notes from T1.06 (DuckDB 2.0.1):
 
-- `SELECT * FROM read_csv('/etc/passwd')`
-- `ATTACH 'x.db'`
-- `COPY (SELECT 1) TO 'out.csv'`
-- `INSTALL httpfs`
-- `LOAD httpfs`
-- `SET memory_limit = '10GB'`
-- `SET enable_external_access = true`
+- `temp_directory = ''` must come first: once external access is off it cannot be changed. It is needed because turning external access off does **not** stop DuckDB spilling large intermediate results to a `.tmp` directory in the working directory (a grouped aggregate under a 50 MB cap wrote about 190 MB and left the files behind). With it set, nothing is written to disk (NFR-5) and a query over the memory cap fails with an out-of-memory error.
+- `python_enable_replacements = false` stops a query reading Python variables by name (a replacement scan), which otherwise works on an unlocked connection.
+- After applying the settings, `session_db.py` reads them back from `duckdb_settings()` and refuses to open the session if any is wrong.
 
-These are confirmed in spike T0.4 (a) before T1.06 builds on them.
+Verification tests (each must raise an error after lockdown, on the pinned DuckDB version): the 22 statements in `tests/unit/test_session_db.py`, including
+
+- `SELECT * FROM read_csv('/etc/passwd')`, `read_text`, `glob`, `read_parquet`, and a URL used as a table
+- `ATTACH 'x.db'`, `COPY ... TO`, `EXPORT DATABASE`
+- `INSTALL httpfs` (also `FROM community`) and `LOAD httpfs`
+- `SET` of memory, threads, external access, extension, replacement and temp-directory options, `PRAGMA memory_limit`, and `SET lock_configuration = false`
+
+Two further tests show that a query cannot read a Python variable and that a query over the memory cap writes no file.
+
+### Catalog integrity check
+
+DuckDB has no read-only mode for in-memory databases, so DDL and DML are stopped only by the validator (rules V2 and V3). As a second layer, `SessionDatabase.verify_catalog()` compares the database with a snapshot taken at load and is called by the executor after every query. It covers every database, schema, table, view, sequence, type, macro and index, each column's name and type, the row count, and a hash of all values (a sum of per-row hashes, so duplicate rows do not cancel). Any difference marks the session corrupted and raises `SessionCorruptedError`; the session then refuses further use until the file is uploaded again. Only the kinds of change are logged, never names or values.
+
+The value hash is skipped above 50 million cells (rows times columns), because it would add seconds per question (about 0.3 s at that size, 4 s for 2 million rows by 300 columns). Above the cap a changed value is caught only by the validator; structure and row counts are still checked.
 
 ## 6. Upload safety
 
