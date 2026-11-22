@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from analyst.config.settings import Settings, get_settings
+from analyst.config.settings import ModelPrice, Settings, get_settings
 
 
 def test_defaults_match_adr_0014():
@@ -99,3 +99,42 @@ def test_settings_are_immutable():
 
 def test_get_settings_is_cached():
     assert get_settings() is get_settings()
+
+
+def test_llm_prices_default_to_none_configured():
+    assert Settings(_env_file=None).llm_prices == {}
+
+
+def test_llm_prices_are_read_from_json(monkeypatch):
+    monkeypatch.setenv(
+        "LLM_PRICES",
+        '{"model-a": {"input_per_mtok": 1.5, "output_per_mtok": 6, "cached_input_per_mtok": 0.2},'
+        ' "model-b": {"input_per_mtok": 0.1, "output_per_mtok": 0.4}}',
+    )
+    prices = Settings(_env_file=None).llm_prices
+    assert prices["model-a"] == ModelPrice(
+        input_per_mtok=1.5, output_per_mtok=6.0, cached_input_per_mtok=0.2
+    )
+    assert prices["model-b"].cached_input_per_mtok is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        '{"m": {"input_per_mtok": -1, "output_per_mtok": 1}}',
+        '{"m": {"input_per_mtok": 1}}',
+        '{"m": {"input_per_mtok": 1, "output_per_mtok": 1, "typo_per_mtok": 3}}',
+        '{"m": {"input_per_mtok": 1, "output_per_mtok": 1, "cached_input_per_mtok": -0.1}}',
+        '{"m": 5}',
+    ],
+)
+def test_llm_prices_reject_bad_entries(monkeypatch, bad):
+    monkeypatch.setenv("LLM_PRICES", bad)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_model_price_is_immutable():
+    price = ModelPrice(input_per_mtok=1, output_per_mtok=2)
+    with pytest.raises(ValidationError):
+        price.input_per_mtok = 5
