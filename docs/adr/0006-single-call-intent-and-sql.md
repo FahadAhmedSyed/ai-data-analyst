@@ -20,3 +20,4 @@ A single structured call returns, in field order: resolved question, intent (ope
 
 - Lower latency and cost per question.
 - If the spike shows the two-call design is clearly more accurate, this ADR is superseded before T1.12.
+- T1.12 was written ahead of the spike, against the scripted fake. `Generator` returns the same things (kind, SQL, message, unknown columns) whether it makes one call or two, so a change to two calls would rework its inside and not its callers.
