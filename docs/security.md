@@ -43,6 +43,7 @@
 | T8 | Per-session DuckDB in `st.session_state`; no user data in globals or Streamlit caches | Session | Two-session AppTest |
 | T9 | Shared password; OpenAI project spend cap; 20 questions per 10 minutes per session | UI, account | Gate and limiter tests |
 | T10 | Logs carry metadata only; SQL text behind a debug flag | Logging | Log assertion tests |
+| T10 | Failure messages shown to users are fixed text chosen by category, never the SQL, the database's message or a value; an unexpected exception is logged by its type only and the user sees a plain message | Orchestrator, query loop | Tests with a secret in the exception, a rejected query and a conversion error |
 | T11 | Key from environment only; `.env` git-ignored; `.env.example` has names only; secret scanning in CI | Repository | CI |
 | T12 | Markdown rendered with HTML disabled (Streamlit default); no `unsafe_allow_html` anywhere | UI | UI test with HTML in data |
 | T12 | Text from the explainer and the generator (restatement, assumptions, clarifying question, refusal) has links reduced to their text, images replaced by their alt text, and web and email addresses removed before it is checked or shown, so an injected image address cannot send data out when the answer renders | Explainer, generator, `safe_text` | Explainer and generator tests with a data-carrying image and link |

@@ -62,12 +62,13 @@ from analyst.ingestion.schema_card import (
     estimate_tokens,
     render_schema_card,
 )
+from analyst.memory.conversation import WINDOW_TURNS
 from analyst.pipeline.result_digest import ResultDigest, digest_result
 from analyst.pipeline.result_notes import format_number
 from analyst.sql.validator import ALLOWED_FUNCTION_NAMES
 
 SAMPLE_ROWS = 3
-HISTORY_TURNS = 3
+HISTORY_TURNS = WINDOW_TURNS  # what memory keeps in its window is what the model is shown
 PREVIEW_ROWS = 5
 MAX_QUESTION_CHARS = 2_000
 MAX_SQL_CHARS = 1_500
@@ -132,6 +133,7 @@ class ContextBuilder:
         *,
         sample_rows: Sequence[Mapping[str, Any]] = (),
         history: Sequence[Turn] = (),
+        carried_assumptions: Sequence[str] = (),
         schema_only: bool = False,
     ) -> GenerationContext:
         """Assemble the prompt for a question.
@@ -142,12 +144,14 @@ class ContextBuilder:
             sample_rows: Rows of the table keyed by SQL name; at most three are used.
                 Ignored in schema-only mode.
             history: Earlier turns, oldest first; at most the last three are used.
+            carried_assumptions: Assumptions from answered turns that still apply, oldest
+                first, including those from turns that have left the window (ADR 0011).
             schema_only: Send no values from the file (ADR 0010).
 
         Raises:
             ValueError: The question is empty or longer than ``MAX_QUESTION_CHARS``.
         """
-        text = _clean_question(question)
+        text = clean_question(question)
         card = render_schema_card(
             profile, max_tokens=self._max_card_tokens, include_values=not schema_only
         )
@@ -156,8 +160,9 @@ class ContextBuilder:
             dataset += ["", *self._sample_block(profile, sample_rows)]
         blocks = [self._fence("DATASET", dataset)]
         turns = list(history)[-HISTORY_TURNS:]
-        if turns:
-            blocks.append(self._fence("HISTORY", _history_lines(turns, schema_only)))
+        if turns or carried_assumptions:
+            lines = _history_lines(turns, carried_assumptions, schema_only)
+            blocks.append(self._fence("HISTORY", lines))
         blocks.append(self._fence("QUESTION", [text]))
         user = "\n\n".join(blocks)
         return GenerationContext(
@@ -273,7 +278,12 @@ def fetch_sample_rows(db: SessionDatabase, count: int = SAMPLE_ROWS) -> list[dic
 # -- cleaning ----------------------------------------------------------------------------------
 
 
-def _clean_question(question: str) -> str:
+def clean_question(question: str) -> str:
+    """The question as the model sees it: printable text, stripped.
+
+    Raises:
+        ValueError: The question is empty or longer than ``MAX_QUESTION_CHARS``.
+    """
     text = "".join(ch for ch in question if ch in "\n\t" or ch.isprintable()).strip()
     if not text:
         raise ValueError("the question is empty")
@@ -331,8 +341,16 @@ def _one_line(text: str, limit: int) -> str:
     return clean_text(text, limit)
 
 
-def _history_lines(turns: Sequence[Turn], schema_only: bool) -> list[str]:
+def _history_lines(turns: Sequence[Turn], carried: Sequence[str], schema_only: bool) -> list[str]:
     lines = ["Earlier turns, oldest first. They are context only."]
+    notes = [_one_line(a, MAX_NOTE_CHARS) for a in carried]
+    notes = [n for n in notes if n]
+    if notes:
+        lines.append(
+            "Assumptions already shown to the user and not changed by them, oldest first. "
+            "They still apply; if two conflict, follow the later one:"
+        )
+        lines.extend(f"  - {note}" for note in notes)
     for number, turn in enumerate(turns, start=1):
         lines.append(f"Turn {number} ({turn.status}):")
         lines.append(f"  Question: {_one_line(turn.question, MAX_QUESTION_CHARS)}")

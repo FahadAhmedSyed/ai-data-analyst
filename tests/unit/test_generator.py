@@ -110,6 +110,13 @@ def test_the_call_is_the_generate_stage_with_the_builders_prompt() -> None:
     assert out.approx_tokens == expected.approx_tokens
 
 
+def test_carried_assumptions_reach_the_prompt() -> None:
+    gen, client = generator(answer())
+    run(gen, history=HISTORY, carried_assumptions=["Last year means 2023."])
+    prompt = client.calls[0].messages[1].content
+    assert "  - Last year means 2023." in prompt
+
+
 def test_history_and_schema_only_mode_reach_the_prompt() -> None:
     gen, client = generator(answer(), answer())
     run(gen, history=HISTORY)
