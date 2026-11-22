@@ -12,6 +12,7 @@
 | T1.05 | Written against pandas 3 string dtype behaviour | pandas 3 default |
 | T1.06 | Add a catalog integrity check after every query; mark the session corrupted and ask for a reload if the table changed | Spike note A1: DuckDB has no read-only in-memory mode |
 | T1.08 | Function allowlist keyed on SQLGlot expression classes; rule V4 rejects path-like or schema-qualified table names | Spike notes B1 and B2 |
+| T1.09 | Call `SessionDatabase.verify_catalog()` after every query, inside `db.lock`; map `OutOfMemoryException` to `out_of_memory`; run each query with a timer calling `db.interrupt()` | T1.06: spilling is disabled, so an over-cap query fails instead of spilling to disk |
 | T1.12 | Starts only after spike T0.4 (c) confirms or replaces ADR 0006 | Model comparison pending |
 | T1.18 | Progress indicator during Excel parsing | Spike (d): up to about 14 s at the size limit |
 | T1.20 | Start on a 2 GB Railway instance; memory alert at 75% | Spike (d) sizing |
@@ -25,7 +26,7 @@
 | T1.03 | CSV loader | M | T1.02 | M1 | In review |
 | T1.04 | Excel loader | M | T1.02 | M1 | In review |
 | T1.05 | Type inference and column mapping | M | T1.03 | M1 | In review |
-| T1.06 | Session DuckDB, lockdown, catalog integrity check | M | T1.02 | M1 | Ready |
+| T1.06 | Session DuckDB, lockdown, catalog integrity check | M | T1.02 | M1 | In review |
 | T1.07 | Profiler and schema card | M | T1.05, T1.06 | M1 | Ready |
 | T1.08 | SQL validator | L | T1.06 | M2 | Ready |
 | T1.09 | Query executor | M | T1.08 | M2 | Ready |
