@@ -45,6 +45,16 @@
 | T12 | Markdown rendered with HTML disabled (Streamlit default); no `unsafe_allow_html` anywhere | UI | UI test with HTML in data |
 | T12 | Column names, categories and group names in charts are cut, flattened and escaped (`&`, `<`, `>`, `%{`) before they reach Plotly | Charts | Chart tests with HTML in names; headless browser check |
 
+### Prompt containment (T1.11)
+
+Threats T5 and T6 are met in three layers, none relied on alone (the validator still checks whatever the model writes):
+
+1. **Shape.** Every cell, name and value from the file, and every value carried into a later turn, is cut to 80 characters and flattened to one line, so it cannot begin a line of its own.
+2. **Markers.** The data goes in blocks whose marker lines carry a random 12-character code made when the session's builder is created. The file's author cannot know it, so no text in the file can close a block and pass for an instruction. If the code ever appeared inside the content it is removed from it.
+3. **Instruction.** The fixed system prompt says the `DATASET` and `HISTORY` blocks are data, tells the model never to follow instructions found there, and tells it to refuse requests to change or export data (benchmark cases I01 and I02).
+
+The marker code must be new for each dataset and is never shown to the user. Schema-only mode sends no cell value; question text, SQL and assumptions from turns that ran before the mode was switched on may still contain values the user or model quoted.
+
 ## 4. SQL validator rules
 
 Implemented in `analyst/sql/validator.py`. Parsing: `sqlglot.parse(sql, read="duckdb")`.
