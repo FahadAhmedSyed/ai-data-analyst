@@ -19,7 +19,7 @@ from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt, PositiveInt
 
 # ---------------------------------------------------------------------------
 # Shared literals
@@ -312,6 +312,11 @@ class ValidationResult(_Internal):
     reason: str = ""
     safe_sql: str | None = Field(
         default=None, description="Query wrapped with the row cap; set only when status is ok"
+    )
+    max_rows: PositiveInt | None = Field(
+        default=None,
+        description="Row cap that safe_sql was wrapped with (it asks for one more row); "
+        "set only when status is ok",
     )
 
     @property

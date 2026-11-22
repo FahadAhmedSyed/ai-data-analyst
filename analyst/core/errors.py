@@ -83,10 +83,20 @@ class QueryExecutionError(AnalystError):
     }
 
     def __init__(
-        self, category: ExecutionCategory, detail: str = "", *, user_message: str | None = None
+        self,
+        category: ExecutionCategory,
+        detail: str = "",
+        *,
+        user_message: str | None = None,
+        engine_message: str = "",
     ) -> None:
-        """Create an execution error for one of the known categories."""
+        """Create an execution error for one of the known categories.
+
+        ``engine_message`` is the database's own message, for the corrector that repairs
+        the query. It can quote values from the data, so it is never logged or shown.
+        """
         super().__init__(category, detail, user_message=user_message)
+        self.engine_message = engine_message
 
 
 class LLMError(AnalystError):

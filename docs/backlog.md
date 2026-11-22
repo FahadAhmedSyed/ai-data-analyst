@@ -30,7 +30,7 @@
 | T1.06 | Session DuckDB, lockdown, catalog integrity check | M | T1.02 | M1 | Done |
 | T1.07 | Profiler and schema card | M | T1.05, T1.06 | M1 | Done |
 | T1.08 | SQL validator | L | T1.06 | M2 | In review |
-| T1.09 | Query executor | M | T1.08 | M2 | Ready |
+| T1.09 | Query executor | M | T1.08 | M2 | In review |
 | T1.10 | LLM client and fake | M | T1.02 | M3 | Ready |
 | T1.11 | Prompts, region rules, context builder | M | T1.07 | M3 | Ready |
 | T1.12 | Intent and SQL generator | M | T1.10, T1.11, spike (c) | M3 | Blocked on OpenAI key |

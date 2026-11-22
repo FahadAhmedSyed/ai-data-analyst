@@ -34,7 +34,7 @@ Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.liv
 | Session store | Every lockdown attack in security.md section 5 errors; two sessions isolated; memory cap error is clean; catalog integrity check detects a dropped table | In-memory |
 | Profiler | Every value matches pandas on fixtures; schema card under budget for 150 columns | Fixtures |
 | Validator | 60+ adversarial queries rejected with the right category; 40+ valid queries (including all benchmark gold SQL) accepted; one test per allowlisted function | `tests/unit/sql_cases.yaml` |
-| Executor | Timeout fires within limit + 1 s; truncation flag; each error category | In-memory |
+| Executor | Timeout fires within limit + 1 s; truncation flag; each error category; forged or unvalidated results never run; catalog check after every query; all validator corpora and allowlisted functions run end to end on the locked-down session | In-memory |
 | LLM client | Retry on 429 and 5xx; no retry on 4xx; timeout; cost calculation; `store=false` sent | Mocked transport |
 | Context builder | Prompt snapshots; injection text stays inside the untrusted block; schema-only mode omits values | Fixtures |
 | Generator | Each structured output shape; intent column check; clarification gate | Fake LLM |

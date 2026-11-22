@@ -157,7 +157,7 @@ An empty result is not an error. The answer says so and lists the filter values 
 
 ### Execution (code only)
 
-The executor wraps validated SQL as `SELECT * FROM (...) LIMIT cap + 1`, runs it with a timer thread that calls `connection.interrupt()` at the timeout, fetches at most cap + 1 rows, and logs duration, row count and a SQL hash.
+The validator wraps its checked SQL as `SELECT * FROM (...) LIMIT cap + 1` and records the cap in the `ValidationResult`. The executor runs only that text: it confirms on the session connection that it is exactly one `SELECT`, runs it with a timer thread that calls `connection.interrupt()` at the timeout, fetches at most cap + 1 rows (the extra row sets `truncated`), verifies the catalog after every query, and logs duration, row count and a SQL hash. The database's own error message goes to the corrector in `QueryExecutionError.engine_message` and is never logged.
 
 ### Explanation and grounding
 
