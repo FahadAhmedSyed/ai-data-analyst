@@ -2,7 +2,7 @@
 
 Upload a CSV or Excel file and ask questions about it in plain English. The app turns each question into SQL, checks the SQL, runs it on your data with DuckDB, and answers with an explanation, a table and a chart. Every number in an answer comes from an executed query, never from the language model.
 
-> Status: Phase 1 in progress. The app works end to end with an OpenAI key; deployment and the accuracy benchmark are still to come. See [docs/backlog.md](docs/backlog.md).
+> Status: Phase 1 in progress. The app works end to end with an OpenAI key. The benchmark harness is built; deployment and the first scored run are still to come. See [docs/backlog.md](docs/backlog.md).
 
 ## How it works
 
@@ -41,7 +41,7 @@ uv run ruff format --check .
 uv run pytest --cov
 ```
 
-The default run needs no network or API key. Tests marked `slow` or `live` are excluded; run them with `uv run pytest -m slow` or `-m live`. The accuracy benchmark is described in [eval/README.md](eval/README.md).
+The default run needs no network or API key. Tests marked `slow` or `live` are excluded; run them with `uv run pytest -m slow` or `-m live`. The accuracy benchmark is described in [eval/README.md](eval/README.md); `uv run python -m eval.run --oracle` runs it without a model or a key (it proves the harness, not the model), and a run with a model needs the key and costs money.
 
 ## Project layout
 
@@ -53,7 +53,7 @@ analyst/            Application package
   session/          One browser session: loading a file, rate limit, idle removal, display text
   ui/               The Streamlit page: gate, sidebar, data panel, chat
 docs/               PRD, architecture, security, privacy, testing, ADRs
-eval/               Accuracy benchmark
+eval/               Accuracy benchmark: datasets, cases, scoring, runner
 tests/              unit/, integration/, e2e/
 ```
 
