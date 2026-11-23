@@ -259,11 +259,11 @@ class GenerationResult(_Strict):
     """Output of LLM call 1. Field order matters: intent comes before SQL."""
 
     resolved_question: str = Field(description="The question rewritten to stand alone")
-    intent: Intent
-    assumptions: list[str]
     ambiguities: list[Ambiguity]
     needs_clarification: bool
     clarification_question: str | None
+    intent: Intent
+    assumptions: list[str]
     sql: str | None
     explanation: str = Field(description="What the SQL does, in one or two sentences")
     chart: ChartSpec | None

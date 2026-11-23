@@ -96,7 +96,7 @@ All stages exchange Pydantic models defined in `analyst/core/models.py`. Models 
 | `DatasetProfile` | Internal | `table_name`, `source_name`, `sheet_name`, `row_count`, `column_count`, `columns`, `duplicate_rows`, `primary_date_column`, `latest_date` |
 | `QualityIssue` | Internal | `kind` (duplicate_rows, all_missing, mixed_types, censored_values, ambiguous_date, missing_values, constant), `column`, `count`, `message` |
 | `Intent` | LLM | `operation`, `measures`, `dimensions`, `filters`, `time_range`, `sort`, `limit`, `output` |
-| `GenerationResult` | LLM | `resolved_question`, `intent`, `assumptions`, `ambiguities`, `needs_clarification`, `clarification_question`, `sql`, `explanation`, `chart` |
+| `GenerationResult` | LLM | `resolved_question`, `ambiguities`, `needs_clarification`, `clarification_question`, `intent`, `assumptions`, `sql`, `explanation`, `chart` |
 | `ModelExplanation` | LLM | `answer_markdown`, `key_numbers` (value, column, label), `caveats` |
 | `ValidationResult` | Internal | `status` (ok, correctable, rejected), `category`, `reason`, `safe_sql` |
 | `QueryResult` | Internal | `dataframe`, `row_count`, `truncated`, `duration_ms`; successful queries only |

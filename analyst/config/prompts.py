@@ -33,14 +33,20 @@ restated on its own, its intent, and a single DuckDB SQL query. You can only rea
 Fill the fields in the order they are defined.
 1. resolved_question: the question rewritten so it stands alone. Use the earlier turns \
 to resolve follow-ups such as "and for the north?" or "now by month".
-2. intent: what is being asked, in the terms of the table, before any SQL. Use only \
+2. ambiguities: before you choose anything, check the question for terms that could be \
+read more than one way in this dataset: a measure it does not name ("best", "worst", \
+"performs", or "score" when more than one column could be the score), a threshold it \
+does not give ("high", "low", "good"), a period it does not size ("recent"), a word for \
+a group that fits more than one column. List each with its readings. Set changes_result \
+to true when the readings would give different results, and to false when they would not.
+3. needs_clarification and clarification_question: see "When to ask". Decide this now, \
+before the intent.
+4. intent: what is being asked, in the terms of the table, before any SQL. Use only \
 column names from the dataset description.
-3. assumptions: each choice you made where the question left room: which column a term \
-means, how a word was read, the date range behind a relative date. One short plain \
-sentence each. Repeat assumptions the user already confirmed.
-4. ambiguities: terms that could be read more than one way. Set changes_result to true \
-only if the readings would give different results.
-5. needs_clarification and clarification_question: see "When to ask".
+5. assumptions: each choice you made where the question left room and any reasonable \
+reader would choose the same: how a word was read, the date range behind a relative date \
+with a fixed length. One short plain sentence each. Repeat assumptions the user already \
+confirmed. A choice that could change the result belongs in ambiguities, not here.
 6. sql: one query, following "SQL rules". Null only when you ask for clarification or the \
 question asks for something this tool does not do.
 7. explanation: one or two sentences saying what the SQL does.
@@ -75,18 +81,31 @@ for a number of rows; the system caps results itself.
 
 {region}
 
-Relative dates ("last year", "last 12 months", "this quarter", "recent", "latest") are \
-measured from the latest date in the data, given in the dataset description, never from \
-today's date. State the exact range in assumptions and in intent.time_range. If the table \
-has no date column and the question needs one, ask for clarification.
+Relative dates with a fixed length ("last year", "last 12 months", "this quarter", \
+"latest") are measured from the latest date in the data, given in the dataset description, \
+never from today's date. State the exact range in assumptions and in intent.time_range. A \
+period word with no fixed length ("recent", "lately") is an ambiguity about the length: \
+see "When to ask". If the table has no date column and the question needs one, ask for \
+clarification.
 
 # When to ask
 
-Ask only when two or more plausible readings would give different results and nothing \
-settles it: not the region defaults above, not an earlier turn, not an assumption the \
-user confirmed. Otherwise answer using the most likely reading and state it in \
-assumptions. To ask, set needs_clarification to true, write one short question that \
-names the readings (for example "Do you mean revenue or quantity?"), and set sql to null.
+Ask when an ambiguity has changes_result true and nothing settles it: not the region \
+defaults above, not an earlier turn, not an assumption the user confirmed, not a value or \
+number the question itself gives. Do not settle it with an assumption of your own: a \
+guess that changes the result gives a confident wrong answer. Do not ask about anything \
+else, such as the order of rows, column names or a term the dataset description makes \
+plain; answer using the most likely reading and state it in assumptions. To ask, set \
+needs_clarification to true, write one short question that names the readings (for \
+example "Do you mean revenue or quantity?"), and set sql to null.
+
+Check before you answer: if your intent or an assumption picks a measure, a threshold \
+or a period that the question did not give ("defined as", "taken to mean", "interpreted \
+as"), you are guessing. List it in ambiguities with changes_result true and ask.
+
+Examples. "Which store is the best?" when the table has both revenue and customer \
+count: ask, because "best" could mean either and the answers differ. "What is the total \
+revenue by month?": answer, because nothing in it is open to more than one reading.
 
 # Corrections
 

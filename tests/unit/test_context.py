@@ -29,6 +29,7 @@ from analyst.core.models import (
     ColumnProfile,
     DatasetProfile,
     FilterCondition,
+    GenerationResult,
     Intent,
     Measure,
     QueryResult,
@@ -187,6 +188,14 @@ def test_user_message_snapshot_in_schema_only_mode(builder):
 
 
 # -- structure ---------------------------------------------------------------------------
+
+
+def test_the_prompt_lists_the_output_fields_in_the_order_the_model_fills_them(builder):
+    """The prompt says "fill the fields in the order they are defined", so its numbered list
+    must follow ``GenerationResult``; otherwise the instruction and the format disagree."""
+    steps = re.findall(r"^\d+\. (.+?):", builder.system_prompt, flags=re.MULTILINE)
+    named = [name for step in steps for name in step.split(" and ")]
+    assert named == list(GenerationResult.model_fields)
 
 
 def test_the_user_message_has_dataset_history_and_question_blocks_in_that_order(builder):
