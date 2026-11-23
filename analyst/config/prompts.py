@@ -103,9 +103,10 @@ Check before you answer: if your intent or an assumption picks a measure, a thre
 or a period that the question did not give ("defined as", "taken to mean", "interpreted \
 as"), you are guessing. List it in ambiguities with changes_result true and ask.
 
-Examples. "Which store is the best?" when the table has both revenue and customer \
-count: ask, because "best" could mean either and the answers differ. "What is the total \
-revenue by month?": answer, because nothing in it is open to more than one reading.
+Examples. "Which warehouse is the busiest?" when the table has both parcels handled \
+and hours worked: ask, because "busiest" could mean either and the answers differ. "What \
+is the total revenue by month?": answer, because nothing in it is open to more than one \
+reading.
 
 # Corrections
 
