@@ -34,8 +34,9 @@ Logs carry the status, counts, categories and timings of a question, never its t
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from analyst.config.settings import Settings, get_settings
 from analyst.core.errors import (
@@ -75,6 +76,10 @@ log = get_logger(__name__)
 
 BAD_QUESTION = f"Please type a question about your data, up to {MAX_QUESTION_CHARS:,} characters."
 
+ProgressStage = Literal["understanding", "running", "explaining"]
+"""Where a question has got to, for the interface's progress line (FR-9.2)."""
+ProgressCallback = Callable[[ProgressStage], None]
+
 
 @dataclass(frozen=True)
 class _Understood:
@@ -90,9 +95,19 @@ class _Work:
     stage that raises still leaves its cost and what was understood behind."""
 
     budget: CallBudget
+    progress: ProgressCallback | None = None
     usage: Usage = field(default_factory=Usage)
     understood: _Understood = field(default_factory=_Understood)
     notes: dict[str, Any] = field(default_factory=dict)  # counts and categories for the log
+
+    def tell(self, stage: ProgressStage) -> None:
+        """Tell the interface a stage has begun. Progress cannot fail a question."""
+        if self.progress is None:
+            return
+        try:
+            self.progress(stage)
+        except Exception as error:
+            log.error("progress_failed", extra={"error_type": type(error).__name__})
 
 
 class Analyst:
@@ -141,8 +156,13 @@ class Analyst:
         """The conversation, for the interface to reset."""
         return self._memory
 
-    def ask(self, question: str) -> AnalystResponse:
-        """Answer ``question``. Never raises for a failure of the question itself."""
+    def ask(self, question: str, on_progress: ProgressCallback | None = None) -> AnalystResponse:
+        """Answer ``question``. Never raises for a failure of the question itself.
+
+        ``on_progress`` is told when each stage that takes noticeable time begins, so the
+        interface can show where a question is (FR-9.2). A failure in it never fails the
+        question.
+        """
         started = time.perf_counter()
         try:
             text = clean_question(question)
@@ -150,7 +170,7 @@ class Analyst:
             # Nothing was asked, so nothing is recorded in the conversation.
             return _failed(question.strip()[:MAX_QUESTION_CHARS], BAD_QUESTION, _Understood())
         self._db.touch()
-        work = _Work(CallBudget.from_settings(self._settings))
+        work = _Work(CallBudget.from_settings(self._settings), on_progress)
         try:
             response = self._answer(text, work)
         except LLMError as error:
@@ -183,6 +203,7 @@ class Analyst:
     # -- the stages ----------------------------------------------------------------------------
 
     def _answer(self, question: str, work: _Work) -> AnalystResponse:
+        work.tell("understanding")
         generation = self._generator.generate(
             question,
             self._profile,
@@ -199,6 +220,7 @@ class Analyst:
             return _clarification(question, generation.result, generation.message)
         if generation.kind == "refused":
             return _failed(question, generation.message, work.understood)
+        work.tell("running")
         outcome = self._loop.run(
             generation, self._profile, budget=work.budget, schema_only=self.schema_only
         )
@@ -217,6 +239,7 @@ class Analyst:
         self, question: str, outcome: RunOutcome, result: QueryResult, work: _Work
     ) -> AnalystResponse:
         reading = outcome.generation
+        work.tell("explaining")
         explanation = self._explainer.explain(
             question,
             result,

@@ -2,7 +2,7 @@
 
 Upload a CSV or Excel file and ask questions about it in plain English. The app turns each question into SQL, checks the SQL, runs it on your data with DuckDB, and answers with an explanation, a table and a chart. Every number in an answer comes from an executed query, never from the language model.
 
-> Status: Phase 1 in progress. The app currently shows a placeholder page. See [docs/backlog.md](docs/backlog.md).
+> Status: Phase 1 in progress. The app works end to end with an OpenAI key; deployment and the accuracy benchmark are still to come. See [docs/backlog.md](docs/backlog.md).
 
 ## How it works
 
@@ -27,7 +27,7 @@ cp .env.example .env        # then fill in OPENAI_API_KEY and, optionally, APP_P
 uv run streamlit run app.py
 ```
 
-The app opens at http://localhost:8501.
+The app opens at http://localhost:8501. Choose a CSV or Excel file in the sidebar, check how it will be read, press **Load file**, then ask questions. If `APP_PASSWORD` is set, the page asks for it first. Without `OPENAI_API_KEY` you can still load a file and look at it; questions are switched off.
 
 ## Configuration
 
@@ -50,6 +50,8 @@ app.py              Streamlit entry point (thin)
 analyst/            Application package
   config/           Settings, prompts, region rules
   core/             Shared models, errors, logging
+  session/          One browser session: loading a file, rate limit, idle removal, display text
+  ui/               The Streamlit page: gate, sidebar, data panel, chat
 docs/               PRD, architecture, security, privacy, testing, ADRs
 eval/               Accuracy benchmark
 tests/              unit/, integration/, e2e/

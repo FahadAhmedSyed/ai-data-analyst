@@ -651,6 +651,56 @@ def test_a_bad_question_is_not_activity(db, monkeypatch) -> None:
     assert touched == []
 
 
+# -- progress -------------------------------------------------------------------------------------
+
+
+def test_progress_is_reported_as_each_stage_begins(db) -> None:
+    ana, _ = build(db, *happy())
+    told: list[str] = []
+    ana.ask(QUESTION, on_progress=told.append)
+    assert told == ["understanding", "running", "explaining"]
+
+
+def test_a_question_that_nothing_runs_for_reports_only_that_it_was_understood(db) -> None:
+    ana, _ = build(db, ("generate", asks()))
+    told: list[str] = []
+    ana.ask("Which is best?", on_progress=told.append)
+    assert told == ["understanding"]
+
+
+def test_a_query_that_is_refused_is_never_reported_as_explained(db) -> None:
+    ana, _ = build(db, ("generate", answer(sql="DROP TABLE sales")))
+    told: list[str] = []
+    ana.ask(QUESTION, on_progress=told.append)
+    assert told == ["understanding", "running"]
+
+
+def test_a_bad_question_reports_no_progress(db) -> None:
+    ana, _ = build(db)
+    told: list[str] = []
+    ana.ask("", on_progress=told.append)
+    assert told == []
+
+
+def test_a_progress_callback_that_fails_does_not_fail_the_question(
+    db, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    ana, client = build(db, *happy())
+
+    def broken(stage: str) -> None:
+        raise RuntimeError("SECRET-IN-CALLBACK")
+
+    out = ana.ask(QUESTION, on_progress=broken)
+    assert out.status == "answered"
+    client.assert_exhausted()
+    failed = [r for r in caplog.records if r.getMessage() == "progress_failed"]
+    assert len(failed) == 3  # told at each stage, and it never stopped the question
+    assert {r.error_type for r in failed} == {"RuntimeError"}
+    text = " ".join(f"{r.getMessage()} {vars(r)}" for r in caplog.records)
+    assert "SECRET-IN-CALLBACK" not in text
+
+
 # -- logs -----------------------------------------------------------------------------------------
 
 
