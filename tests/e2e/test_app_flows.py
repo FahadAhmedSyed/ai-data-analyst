@@ -140,7 +140,7 @@ def test_the_quality_tab_lists_what_it_found() -> None:
     csv = b"Site,Rain\nA,1\nA,1\nB,\n"
     page = Page(HAPPY).open_file("rain.csv", csv)
     notes = next(m.value for m in page.at.markdown if "exact copies" in m.value)
-    assert "Rain is missing in 1 rows" in notes.replace("\\", "")
+    assert "Rain is missing in 1 row (" in notes.replace("\\", "")
     assert "2 rows" not in notes or "exact copies" in notes
 
 
