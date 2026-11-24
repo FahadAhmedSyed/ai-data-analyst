@@ -92,6 +92,14 @@ def test_generation_result_field_order_puts_intent_before_sql():
     assert fields.index("needs_clarification") < fields.index("sql")
 
 
+def test_generation_result_field_order_asks_before_it_commits_to_a_reading():
+    """Listing the ambiguities and deciding to ask come before the intent, which holds
+    concrete filters and ranges: a model that has written a reading down stops asking."""
+    fields = list(GenerationResult.model_fields)
+    assert fields.index("ambiguities") < fields.index("needs_clarification")
+    assert fields.index("needs_clarification") < fields.index("intent")
+
+
 # ---------- LLM output models ----------
 
 
