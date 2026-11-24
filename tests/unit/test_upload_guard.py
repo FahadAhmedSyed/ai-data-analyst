@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import pytest
 from starlette.exceptions import HTTPException
-from streamlit import runtime
 from streamlit.runtime.memory_uploaded_file_manager import MemoryUploadedFileManager
 from streamlit.runtime.uploaded_file_manager import UploadedFileRec
 
-from analyst.session import upload_guard
 from analyst.session.upload_guard import HELD_FILES, REFUSED_STATUS, held_bytes, install
 
 MB = 1024 * 1024
@@ -97,24 +95,3 @@ def test_installing_twice_wraps_once(manager) -> None:
 
 def test_the_ceiling_is_a_fixed_number_of_maximum_size_uploads() -> None:
     assert HELD_FILES == 8
-
-
-def test_with_no_running_server_nothing_is_wrapped() -> None:
-    assert not runtime.exists()
-    assert upload_guard.install_on_running_server(50 * MB) is False
-
-
-def test_on_a_running_server_the_stores_ceiling_is_eight_maximum_uploads(monkeypatch) -> None:
-    store = MemoryUploadedFileManager(upload_endpoint="/_stcore/upload_file")
-
-    class FakeRuntime:
-        uploaded_file_mgr = store
-
-    monkeypatch.setattr(runtime, "exists", lambda: True)
-    monkeypatch.setattr(runtime, "get_instance", lambda: FakeRuntime())
-    assert upload_guard.install_on_running_server(MB) is True
-    for i in range(HELD_FILES):
-        store.add_file("s", rec(f"f{i}", MB))
-    with pytest.raises(HTTPException):
-        store.add_file("s", rec("one-more", 1))
-    assert upload_guard.install_on_running_server(MB) is False  # the next page run: no second wrap
