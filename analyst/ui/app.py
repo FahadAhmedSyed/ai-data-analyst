@@ -15,6 +15,7 @@ from analyst.config.settings import get_settings
 from analyst.core.logging import configure_logging
 from analyst.llm.client import LLMClient
 from analyst.session.eviction import start_sweeper
+from analyst.session.upload_guard import install_on_running_server
 from analyst.ui import chat, dataset_view, gate, sidebar
 from analyst.ui.notices import WELCOME
 from analyst.ui.session_store import current_session
@@ -29,6 +30,7 @@ def run(client_factory: Callable[[], LLMClient] | None = None) -> None:
     """
     settings = get_settings()
     configure_logging(settings.log_level)
+    install_on_running_server(settings.max_upload_bytes)  # before the gate: it guards visitors too
     st.set_page_config(
         page_title="AI Data Analyst", layout="wide", initial_sidebar_state="expanded"
     )
