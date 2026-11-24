@@ -1,0 +1,30 @@
+# Keep the build small and keep secrets and data out of the image.
+# Only requirements.txt, app.py, .streamlit/ and analyst/ are copied, but anything not listed
+# here is still sent to the builder, so list what must never leave the machine.
+
+.git
+.github
+.venv
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Datasets, uploads and reports are never part of the image.
+eval/data
+eval/reports
+uploads
+*.duckdb
+*.db
+
+# Not needed to run the app.
+tests
+docs
+eval

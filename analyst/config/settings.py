@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # client and the password gate check for them when they are needed.
     openai_api_key: SecretStr | None = None
     app_password: SecretStr | None = None
+    # True for a deployment (the Dockerfile sets it): with no ``app_password`` the app then
+    # refuses to open, instead of opening to everyone who has the address (ADR 0012).
+    require_gate: bool = False
 
     # Models per pipeline stage, chosen after the model comparison spike (ADR 0004).
     llm_model_generate: str | None = None

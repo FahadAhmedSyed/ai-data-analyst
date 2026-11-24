@@ -2,7 +2,7 @@
 
 Upload a CSV or Excel file and ask questions about it in plain English. The app turns each question into SQL, checks the SQL, runs it on your data with DuckDB, and answers with an explanation, a table and a chart. Every number in an answer comes from an executed query, never from the language model.
 
-> Status: Phase 1 in progress. The app works end to end with an OpenAI key. The benchmark harness is built; deployment and the first scored run are still to come. See [docs/backlog.md](docs/backlog.md).
+> Status: Phase 1 in progress. The app works end to end with an OpenAI key. The benchmark harness is built and the deployment files are ready; the first deploy on Railway and the held-out benchmark run are still to come. See [docs/backlog.md](docs/backlog.md).
 
 ## How it works
 
@@ -33,6 +33,10 @@ The app opens at http://localhost:8501. Choose a CSV or Excel file in the sideba
 
 All settings are environment variables, listed with defaults in [.env.example](.env.example) and defined in [analyst/config/settings.py](analyst/config/settings.py). Limits follow [ADR 0014](docs/adr/0014-resource-limits.md).
 
+## Deploy on Railway
+
+The repository builds as a container (`Dockerfile`) and starts closed: with no `APP_PASSWORD` the page refuses to open. The Railway steps, variables, memory sizing and troubleshooting are in [docs/deployment.md](docs/deployment.md). After a deploy, check the live address with `python scripts/check_deployment.py https://your-address`.
+
 ## Tests
 
 ```bash
@@ -47,6 +51,7 @@ The default run needs no network or API key. Tests marked `slow` or `live` are e
 
 ```text
 app.py              Streamlit entry point (thin)
+Dockerfile          The image Railway builds (railway.json: health check, restart policy)
 analyst/            Application package
   config/           Settings, prompts, region rules
   core/             Shared models, errors, logging
@@ -54,6 +59,7 @@ analyst/            Application package
   ui/               The Streamlit page: gate, sidebar, data panel, chat
 docs/               PRD, architecture, security, privacy, testing, ADRs
 eval/               Accuracy benchmark: datasets, cases, scoring, runner
+scripts/            check_deployment.py: checks a live address from outside
 tests/              unit/, integration/, e2e/
 ```
 
@@ -64,7 +70,7 @@ More packages are added as Phase 1 tasks land; see [docs/architecture.md](docs/a
 - [Product requirements](docs/prd.md)
 - [Architecture](docs/architecture.md)
 - [Architecture decision records](docs/adr/README.md)
-- [Security](docs/security.md) and [privacy](docs/privacy.md)
+- [Security](docs/security.md), [privacy](docs/privacy.md) and [deployment](docs/deployment.md)
 - [Testing strategy](docs/testing.md) and [benchmark](eval/README.md)
 - [Risk register](docs/risks.md) and [Phase 1 backlog](docs/backlog.md)
 - [Phase 0 spike results](docs/spikes.md)

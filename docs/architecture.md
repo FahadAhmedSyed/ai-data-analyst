@@ -314,6 +314,7 @@ Settings come from environment variables via pydantic-settings. Names (finalised
 | `LLM_MODEL_GENERATE`, `LLM_MODEL_EXPLAIN` | Model per stage |
 | `LLM_TIMEOUT_S`, `LLM_MAX_RETRIES` | Per-attempt timeout and retries for rate limits and server errors |
 | `LLM_PRICES` | JSON map of model name to prices per million tokens, for cost logging |
+| `REQUIRE_GATE` | `true` in the container image: with no `APP_PASSWORD` the app stays closed (default `false`, so local runs are open) |
 | `MAX_UPLOAD_MB`, `MAX_ROWS`, `MAX_COLUMNS` | Upload limits |
 | `QUERY_TIMEOUT_S`, `MAX_RESULT_ROWS`, `DUCKDB_MEMORY_LIMIT`, `DUCKDB_THREADS` | Execution limits |
 | `MAX_CORRECTIONS`, `MAX_LLM_CALLS` | Pipeline budgets |
@@ -327,13 +328,13 @@ JSON lines via the standard library. Each question logs: session hash, stage, du
 
 ## 12. Deployment
 
-One Railway service, one replica. Start command:
+One Railway service, one replica, built from the `Dockerfile` ([ADR 0019](adr/0019-container-deployment.md)). The image's start command is:
 
 ```
-streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+streamlit run app.py --server.port=${PORT:-8501} --server.address=0.0.0.0 --server.headless=true
 ```
 
-Health check: `/_stcore/health`. Secrets in Railway variables. Upload limit set in `.streamlit/config.toml` (`server.maxUploadSize`). A restart clears all sessions. Details in `docs/deployment.md` (T1.20).
+Health check: `/_stcore/health` (set in `railway.json`). Secrets in Railway variables. The image sets `REQUIRE_GATE=true`, so a deployment with no `APP_PASSWORD` shows a closed page instead of opening to everyone. Upload limit set in `.streamlit/config.toml` (`server.maxUploadSize`) and `MAX_UPLOAD_MB`. A restart clears all sessions. Memory: about 140 MB for the server and its libraries, plus the sessions; a 2 GB plan. Steps, settings and troubleshooting in [deployment](deployment.md).
 
 ## 13. Evolution beyond the MVP
 

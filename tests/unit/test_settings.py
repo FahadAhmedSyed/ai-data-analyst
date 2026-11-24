@@ -83,6 +83,12 @@ def test_password_required_only_when_non_empty(monkeypatch):
     assert Settings(_env_file=None).password_required is True
 
 
+def test_a_password_is_not_required_unless_the_deployment_says_so(monkeypatch):
+    assert Settings(_env_file=None).require_gate is False
+    monkeypatch.setenv("REQUIRE_GATE", "true")
+    assert Settings(_env_file=None).require_gate is True
+
+
 def test_llm_configured_needs_key_and_both_models(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-x")
     assert Settings(_env_file=None).llm_configured is False
