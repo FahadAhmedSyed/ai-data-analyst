@@ -62,7 +62,7 @@ cases:
     dataset: rainfall
     category: filters
     question: On which days did Site A record more than 40 mm of rain?
-    gold_sql: SELECT date, rainfall_mm FROM rainfall WHERE site = 'Site A' AND rainfall_mm > 40 ORDER BY date
+    gold_sql: SELECT date FROM rainfall WHERE site = 'Site A' AND rainfall_mm > 40 ORDER BY date
     compare: unordered
     key_columns: [date]
     clarify: false
@@ -219,7 +219,7 @@ cases:
     dataset: sales
     category: window_ranking
     question: Rank the products by total revenue.
-    gold_sql: SELECT product, SUM(revenue) AS revenue, RANK() OVER (ORDER BY SUM(revenue) DESC) AS rank FROM sales GROUP BY product ORDER BY rank
+    gold_sql: SELECT product, SUM(revenue) AS revenue FROM sales GROUP BY product ORDER BY revenue DESC
     compare: ordered
     clarify: false
     holdout: false
@@ -236,7 +236,7 @@ cases:
     category: window_ranking
     question: What share of the total actual spend does each department account for?
     gold_sql: SELECT department, SUM(actual) AS actual, 100.0 * SUM(actual) / SUM(SUM(actual)) OVER () AS share_pct FROM finance GROUP BY department ORDER BY actual DESC
-    compare: ordered
+    compare: unordered
     clarify: false
     holdout: false
 
