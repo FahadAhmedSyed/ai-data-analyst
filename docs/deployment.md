@@ -80,7 +80,7 @@ I started the image here with a 2 GB limit and measured it with a real browser (
 | One browser session open (the app and its libraries loaded) | about 140 MB |
 | After loading a 120,000-row, 5-column CSV (3.9 MB) in that session | about 220 MB |
 
-So the server and its libraries cost about 140 MB, and a small session adds about 80 MB. The earlier measurement for a maximum-size file (about 150 MB steady and 300 MB at peak per session, [spikes](spikes.md)) still applies on top of the baseline, which is why the plan is **2 GB**: roughly 8 maximum-size sessions at once, or many more small ones. The app's own limits (ADR 0014) and the removal of idle sessions after 60 minutes are the protection if it gets busy.
+So the server and its libraries cost about 140 MB, and a small session adds about 80 MB. The earlier measurement for a maximum-size file (about 150 MB steady and 300 MB at peak per session, [spikes](spikes.md)) still applies on top of the baseline, which is why the plan is **2 GB**: roughly 8 maximum-size sessions at once, or many more small ones. The app's own limits (ADR 0014) and the removal of idle sessions after 60 minutes are the protection if it gets busy. Files that are chosen but not yet loaded are held in memory too; they are capped at 8 maximum-size files (400 MB) over all sessions, so a visitor who has not signed in cannot use up the memory by sending files ([security](security.md) T13).
 
 **The memory alert at 75%.** Railway's documentation (read on 2026-11-24) says monitors need the **Pro** plan (US$20 a month). If you are on Pro: open the project, then **Observability**, add a widget with the **Memory Usage** source, open its three-dot menu, choose **Add monitor**, and set the threshold to 1.5 GB (75% of 2 GB). Alerts go by email and in the app. It is a dashboard setting; it cannot be kept in the repository. On Hobby there is no alert: look at the service's **Metrics** graph now and then in the first weeks, and treat a line that keeps climbing as the sign to raise the limit or restart.
 
@@ -119,6 +119,7 @@ Then open http://localhost:8501. Without `-e APP_PASSWORD=...` the page shows th
 | The page says "This copy of the app has no password set, so it is closed" | `APP_PASSWORD` is missing or empty. Add it |
 | The page says questions are switched off | `OPENAI_API_KEY` or one of the two model names is missing |
 | An answer fails with a connection error | The service cannot reach OpenAI: an unverified Trial plan, or a wrong key. Check the logs for the error category |
+| An upload fails with "The server is holding too many uploads right now" | The 400 MB ceiling on files held in memory was reached, by busy testers or by someone sending files. It clears in a few minutes, when those sessions end. If it keeps happening, read the logs for `upload_refused` and check who is connected |
 | Everyone was signed out and their files are gone | A restart or deploy. Check **Deployments** and the Metrics graph for an out-of-memory stop |
 | The checker says a secret file is served | Stop: take the service offline, then find out which file and why. Rotate the key and the password |
 

@@ -1,0 +1,32 @@
+name: Dependency audit
+
+# Checks the pinned packages in requirements.txt (what the Docker image installs) against the
+# public vulnerability database. It runs every Monday, when the pins change, and on request, and
+# it is kept apart from CI so a new advisory for an old package never blocks an unrelated pull
+# request. A red run here means: read the advisory, then update the package or record why not.
+
+on:
+  schedule:
+    - cron: "17 20 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - requirements.txt
+      - uv.lock
+      - pyproject.toml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Audit the pinned packages
+        run: uvx pip-audit==2.10.1 -r requirements.txt --no-deps --disable-pip
