@@ -2,7 +2,9 @@
 
 Log records carry metadata only: timings, counts, categories and hashes.
 Callers must never pass dataset values, sample rows, result rows, answer text
-or secrets as log fields (see docs/security.md, threat T10).
+or secrets as log fields (see docs/security.md, threat T10). An exception is
+logged by its type and where it happened, never by its message: a parse error
+quotes the SQL around the fault, and a conversion error quotes the value.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import hashlib
 import json
 import logging
 import sys
+import traceback
 from datetime import UTC, datetime
 from typing import Any
 
@@ -36,8 +39,24 @@ class JsonFormatter(logging.Formatter):
                 payload[key] = value
         if record.exc_info:
             payload["exc_type"] = record.exc_info[0].__name__ if record.exc_info[0] else None
-            payload["exc"] = self.formatException(record.exc_info)
+            payload["exc"] = _where(record.exc_info[1])
         return json.dumps(payload, default=str, ensure_ascii=False)
+
+
+def _where(error: BaseException | None) -> str:
+    """The exception types and the code locations of a traceback, with no message or source.
+
+    Follows ``raise ... from`` and implicit chaining, so the cause is shown by type too.
+    """
+    lines: list[str] = []
+    seen: set[int] = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        frames = traceback.extract_tb(error.__traceback__)
+        where = " <- ".join(f"{f.filename}:{f.lineno} in {f.name}" for f in reversed(frames))
+        lines.append(f"{type(error).__name__} at {where}" if where else type(error).__name__)
+        error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
+    return "\n".join(lines)
 
 
 def configure_logging(level: str = "INFO", stream: Any = None) -> logging.Logger:
