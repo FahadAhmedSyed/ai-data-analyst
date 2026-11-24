@@ -21,7 +21,8 @@
 | UI | `tests/e2e/` | No (fake LLM) | Every push (CI) | Streamlit AppTest flows |
 | Benchmark harness | `tests/eval/` | No (scripted model and the oracle) | Every push (CI) | The datasets, case files, scoring, runner, report and command line; every gold query through the real validator and executor |
 | Live benchmark | `eval/` | Yes (OpenAI) | On demand, with a cost cap | Accuracy, latency, cost |
-| Deployment smoke | `tests/smoke/` | Yes | After each deploy | The deployed app answers one question |
+| Deployment files | `tests/unit/test_deploy_files.py`, `tests/unit/test_check_deployment.py` | No (a local server) | Every push (CI) | The `Dockerfile`, `.dockerignore` and `railway.json` (no secret, non-root, `$PORT`, the health route Streamlit really serves) and the live-address checker |
+| Deployment smoke | `scripts/check_deployment.py` | Yes | After each deploy, by hand | The deployed address is served over HTTPS, the health check says ok, the page loads and no secret file is served. A question end to end is tried by hand ([deployment](deployment.md) section 3) |
 
 Markers: `@pytest.mark.slow` for tests over 5 s (large files); `@pytest.mark.live` for anything calling OpenAI, excluded by default.
 

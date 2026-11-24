@@ -118,6 +118,52 @@ def test_no_password_set_means_no_gate(monkeypatch) -> None:
     assert len(page.at.text_input) == 0
 
 
+# -- a deployment with no password stays closed ---------------------------------------------------
+
+
+@pytest.fixture
+def deployed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REQUIRE_GATE", "true")
+    get_settings.cache_clear()
+
+
+def test_a_deployment_with_no_password_is_closed_not_open(deployed, monkeypatch) -> None:
+    monkeypatch.delenv("APP_PASSWORD", raising=False)
+    page = Page()
+    assert page.at.error[0].value == gate.CLOSED_MESSAGE
+    assert len(page.at.text_input) == 0  # no form to guess at: there is nothing to enter
+    assert len(page.at.file_uploader) == 0
+    assert len(page.at.chat_input) == 0
+    assert not page.at.markdown
+
+
+def test_an_empty_password_in_a_deployment_is_closed_too(deployed, monkeypatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "")
+    page = Page()
+    assert page.at.error[0].value == gate.CLOSED_MESSAGE
+    assert len(page.at.file_uploader) == 0
+
+
+def test_a_deployment_with_a_password_shows_the_form_as_before(deployed, password) -> None:
+    page = Page()
+    assert page.at.text_input[0].label == "Password"
+    assert len(page.at.error) == 0
+    enter(page, PASSWORD)
+    assert len(page.at.file_uploader) == 1
+
+
+def test_the_closed_message_asks_for_the_setting_and_gives_away_nothing_else() -> None:
+    assert "APP_PASSWORD" in gate.CLOSED_MESSAGE
+    assert "OPENAI" not in gate.CLOSED_MESSAGE
+
+
+def test_the_closed_state_is_logged_as_an_error(deployed, monkeypatch, capsys) -> None:
+    monkeypatch.delenv("APP_PASSWORD", raising=False)
+    Page()
+    (closed,) = [r for r in log_lines(capsys) if r["event"] == "password_required_but_not_set"]
+    assert closed["level"] == "ERROR"
+
+
 # -- the comparison -------------------------------------------------------------------------------
 
 

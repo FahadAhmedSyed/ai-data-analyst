@@ -1,10 +1,11 @@
 """The shared password (FR-10.1, ADR 0012).
 
 A small group of testers share one password, set in ``APP_PASSWORD``. With none set the gate
-is open, which is for running locally; a deployment must set it. The comparison takes the
-same time whatever is typed, and a wrong guess waits a second before it is answered, which
-slows a script that tries many on one connection (it does not stop one that opens many; the
-spend cap on the OpenAI project is for that).
+is open, which is for running locally. A deployment sets ``REQUIRE_GATE`` (the Dockerfile
+does), and then a missing password closes the app instead of leaving it open to anyone with
+the address. The comparison takes the same time whatever is typed, and a wrong guess waits a
+second before it is answered, which slows a script that tries many on one connection (it does
+not stop one that opens many; the spend cap on the OpenAI project is for that).
 """
 
 from __future__ import annotations
@@ -22,6 +23,10 @@ log = get_logger(__name__)
 AUTHENTICATED_KEY = "authenticated"
 FAILED_LOGIN_DELAY_S = 1.0
 LOGIN_FAILED_MESSAGE = "That password isn't right."
+CLOSED_MESSAGE = (
+    "This copy of the app has no password set, so it is closed. The person who runs it needs to "
+    "set APP_PASSWORD."
+)
 
 
 def _wait(seconds: float) -> None:
@@ -39,6 +44,11 @@ def password_matches(entered: str, settings: Settings) -> bool:
 
 def passed(settings: Settings) -> bool:
     """True when the session may use the app; otherwise draws the password form."""
+    if settings.require_gate and not settings.password_required:
+        log.error("password_required_but_not_set")
+        st.title("AI Data Analyst")
+        st.error(CLOSED_MESSAGE)
+        return False
     if not settings.password_required or st.session_state.get(AUTHENTICATED_KEY):
         return True
     st.title("AI Data Analyst")

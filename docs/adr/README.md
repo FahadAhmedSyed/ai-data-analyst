@@ -22,5 +22,6 @@
 | [0016](0016-repository-and-workflow.md) | New repository, branches and reviewed pull requests | D11 |
 | [0017](0017-grounded-numbers.md) | Every number in an answer is grounded in results | Pipeline |
 | [0018](0018-standing-push-approval.md) | Finished task branches are pushed and opened as PRs without asking; merging stays with Fahad (amends 0016) | 2026-11-22 |
+| [0019](0019-container-deployment.md) | Deploy on Railway as a container that starts closed (Dockerfile, health check, 2 GB, one replica) | T1.20 |
 
 Format: context, decision, alternatives considered, consequences. A changed decision gets a new ADR that supersedes the old one; accepted ADRs are not edited in place.

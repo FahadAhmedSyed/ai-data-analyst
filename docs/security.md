@@ -166,6 +166,8 @@ The value hash is skipped above 50 million cells (rows times columns), because i
 | `OPENAI_API_KEY` | Railway variables; local `.env`; cloud environment settings | In Git, logs, chat or prompts |
 | `APP_PASSWORD` | Railway variables; local `.env` | In Git or logs |
 
+The container image sets `REQUIRE_GATE=true` and holds no secret. With that set and no `APP_PASSWORD`, the app shows a closed page, so one forgotten variable cannot leave a deployment open ([ADR 0019](adr/0019-container-deployment.md)). `.dockerignore` keeps `.env` out of the build.
+
 ## 8. Review checklist for every pull request
 
 - [ ] No new SQL execution path bypasses the validator and executor
