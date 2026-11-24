@@ -121,3 +121,16 @@ def test_streamlits_config_is_safe_for_a_public_address() -> None:
     assert server.get("enableCORS", True) is True
     assert server.get("runOnSave", False) is False
     assert server.get("developmentMode", False) is False
+
+
+def test_the_dependency_audit_runs_weekly_on_the_file_the_image_installs() -> None:
+    import yaml
+
+    workflow = yaml.safe_load((ROOT / ".github/workflows/audit.yml").read_text())
+    triggers = workflow[True]  # YAML reads the key `on` as the boolean True
+    assert triggers["schedule"] and "workflow_dispatch" in triggers
+    assert "requirements.txt" in triggers["pull_request"]["paths"]
+    (step,) = [s for s in workflow["jobs"]["audit"]["steps"] if "run" in s]
+    assert "-r requirements.txt" in step["run"]
+    assert re.search(r"pip-audit==\d+\.\d+\.\d+", step["run"])  # pinned, like the rest
+    assert workflow["permissions"] == {"contents": "read"}

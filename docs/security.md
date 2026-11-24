@@ -28,6 +28,7 @@
 | T10 | Sensitive data in logs | Bug | Data exposed to anyone with log access |
 | T11 | Secrets committed to Git | Mistake | Key compromise |
 | T12 | HTML or script in rendered answers | Data or model | Phishing or script execution in the browser |
+| T13 | Memory used up before sign-in: Streamlit's upload route takes files from any open session and does not check the password | Anyone with the link | Process out of memory, restart, every session lost |
 
 ## 3. Controls
 
@@ -45,7 +46,9 @@
 | T9 | Shared password; OpenAI project spend cap; 20 questions per 10 minutes per session | UI, account | Gate and limiter tests |
 | T9 | The limit is on the session and survives replacing the dataset, a new conversation and idle removal, so uploading again does not buy more questions. It is a sliding window, and a refused question makes no model call and is not remembered. A wrong password waits a second before the answer, the comparison is constant-time and nothing typed is logged | `limiter`, `AnalystSession`, gate | Boundary tests of the window; AppTests that the limit survives each reset; a test that the typed password is in no log line |
 | T10 | Logs carry metadata only; SQL text behind a debug flag | Logging | Log assertion tests |
+| T10 | The log formatter writes an exception's type and the code location of each exception in its chain, never its message or source text. A message can quote the SQL or a value (SQLGlot's parse errors quote the text near the fault), and the validator logs exceptions from SQLGlot | Logging | Tests with a secret in a message, in a chained exception and in both validator call sites |
 | T10 | Failure messages shown to users are fixed text chosen by category, never the SQL, the database's message or a value; an unexpected exception is logged by its type only and the user sees a plain message | Orchestrator, query loop | Tests with a secret in the exception, a rejected query and a conversion error |
+| T13 | The upload store Streamlit's route writes to is wrapped on start-up: a file that would take the bytes held, over all sessions, above 8 maximum-size uploads (400 MB at the 50 MB limit) is refused with 413. The wrap runs on the first page run, before the password gate, so it covers visitors who are not signed in. Measured on a local server with the gate showing: without it, five 40 MB files were accepted and held; with it, nine were accepted and then 413, with the held memory staying at 377 MB. The cost is that a visitor can fill the ceiling and make real uploads fail until the files expire (the session ends and Streamlit's 120-second time to live runs out); the server stays up | Upload store (`upload_guard`) | Unit tests on Streamlit's own store; the probe above |
 | T11 | Key from environment only; `.env` git-ignored; `.env.example` has names only; secret scanning in CI | Repository | CI |
 | T12 | Markdown rendered with HTML disabled (Streamlit default); no `unsafe_allow_html` anywhere | UI | UI test with HTML in data; a source scan |
 | T12 | Text that came from the file, the user or the model (file and column names, filter values, the question, restatement, assumptions, notes, quality notes) is shown through `escape_markdown`, which escapes every ASCII punctuation mark, so no link, image, heading, code span, emoji shortcode or colour directive can form, and puts an invisible zero-width space inside every web or email address (after `:` before `//`, after `www`, after `@`), because Streamlit's markdown makes a link of a bare address after the escapes are read (found in a real browser, which AppTest cannot show). Only the cleaned explanation is rendered as markdown, with `$` escaped | `analyst/session/display.py`, UI | Hostile-text unit tests; AppTests with markup in a file name, column names, values and every model text, and again with the response rewritten as if no earlier layer had cleaned it |
@@ -62,6 +65,13 @@ Threats T5 and T6 are met in three layers, none relied on alone (the validator s
 3. **Instruction.** The fixed system prompt says the `DATASET`, `HISTORY` and `PROBLEM` blocks are data, tells the model never to follow instructions found there, and tells it to refuse requests to change or export data (benchmark cases I01 and I02).
 
 The marker code must be new for each dataset and is never shown to the user. Schema-only mode sends no cell value; question text, SQL and assumptions from turns that ran before the mode was switched on may still contain values the user or model quoted.
+
+### Known limits for the alpha
+
+- **The question limit is per browser session, not per person.** Opening a new tab or reloading starts a new session with a new counter, so someone who has the password can ask more than 20 questions in 10 minutes. The OpenAI project's spend cap is what limits the cost. A cap over the whole process is a possible later change.
+- **Streamlit serves a few routes of its own without the password**, for example `/_stcore/health` (needed by Railway) and `/_stcore/metrics`, which shows counts of sessions and the bytes held for uploads. They show no data, but they show that the app is there and how busy it is.
+- **A wrong guess at the password waits one second in that session only.** A script that opens many sessions is not slowed; use a long, random password.
+- **Browser extensions or a shared computer can read the page.** Out of scope for the alpha.
 
 ## 4. SQL validator rules
 
@@ -172,7 +182,8 @@ The container image sets `REQUIRE_GATE=true` and holds no secret. With that set 
 
 - [ ] No new SQL execution path bypasses the validator and executor
 - [ ] No user data in globals, `st.cache_data` or `st.cache_resource`
-- [ ] No dataset values or answer text in logs
+- [ ] No dataset values or answer text in logs, and no exception message (the formatter drops it, so a new `log.exception` is safe, but a message put in `extra` is not)
+- [ ] No new route or endpoint that works without passing the password gate; if Streamlit adds one, say what it can hold or reveal
 - [ ] No `unsafe_allow_html`
 - [ ] No secrets or real datasets in the diff
 - [ ] New allowlisted functions have a test

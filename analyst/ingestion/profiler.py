@@ -361,7 +361,8 @@ def quality_summary(
                     column=column.sql_name,
                     count=column.null_count,
                     message=(
-                        f"{name} is missing in {column.null_count:,} rows "
+                        f"{name} is missing in {column.null_count:,} "
+                        f"{'row' if column.null_count == 1 else 'rows'} "
                         f"({_percent(column.null_count, rows)})."
                     ),
                 )

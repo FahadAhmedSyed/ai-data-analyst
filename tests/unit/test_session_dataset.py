@@ -46,7 +46,7 @@ def test_a_csv_file_is_loaded_typed_and_profiled(db) -> None:
 def test_the_quality_notes_come_with_the_file(db) -> None:
     out = load(db)
     assert [i.kind for i in out.issues] == ["missing_values"]
-    assert "Revenue is missing in 1 rows" in out.issues[0].message
+    assert "Revenue is missing in 1 row (" in out.issues[0].message
 
 
 def test_the_preview_is_made_with_the_dataset(db) -> None:

@@ -488,6 +488,12 @@ def test_duplicate_rows_are_reported_first_with_a_share():
     assert (issues[1].count, issues[1].column) == (10, "a")
 
 
+def test_one_missing_value_is_one_row_not_one_rows():
+    profile = make_profile(rows=200, duplicates=0, a=col("a", nulls=1, display="Rainfall (mm)"))
+    (issue,) = quality_summary(profile)
+    assert issue.message == "Rainfall (mm) is missing in 1 row (0.5%)."
+
+
 @pytest.mark.parametrize(
     ("count", "rows", "expected"),
     [

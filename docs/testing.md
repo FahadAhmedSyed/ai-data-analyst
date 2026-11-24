@@ -21,6 +21,7 @@
 | UI | `tests/e2e/` | No (fake LLM) | Every push (CI) | Streamlit AppTest flows |
 | Benchmark harness | `tests/eval/` | No (scripted model and the oracle) | Every push (CI) | The datasets, case files, scoring, runner, report and command line; every gold query through the real validator and executor |
 | Live benchmark | `eval/` | Yes (OpenAI) | On demand, with a cost cap | Accuracy, latency, cost |
+| Upload ceiling | `tests/unit/test_upload_guard.py` | No | Every push (CI) | On Streamlit's own file store: files under the ceiling stored; one over it refused with 413 and not stored; room returns when a session ends or a file is removed; installed once; nothing is wrapped without a server |
 | Deployment files | `tests/unit/test_deploy_files.py`, `tests/unit/test_check_deployment.py` | No (a local server) | Every push (CI) | The `Dockerfile`, `.dockerignore` and `railway.json` (no secret, non-root, `$PORT`, the health route Streamlit really serves) and the live-address checker |
 | Deployment smoke | `scripts/check_deployment.py` | Yes | After each deploy, by hand | The deployed address is served over HTTPS, the health check says ok, the page loads and no secret file is served. A question end to end is tried by hand ([deployment](deployment.md) section 3) |
 

@@ -51,7 +51,8 @@ def test_exception_is_serialised():
         get_logger("x").exception("failed")
     [record] = _lines(stream)
     assert record["exc_type"] == "ValueError"
-    assert "boom" in record["exc"]
+    assert "ValueError" in record["exc"]  # the type and the place are logged ...
+    assert "boom" not in record["exc"]  # ... the message is not (security T10)
 
 
 def test_get_logger_names():
@@ -64,3 +65,36 @@ def test_sql_hash_is_stable_and_short():
     assert sql_hash("SELECT 1") == sql_hash("SELECT 1")
     assert sql_hash("SELECT 1") != sql_hash("SELECT 2")
     assert len(sql_hash("SELECT 1")) == 12
+
+
+def test_an_exception_message_is_never_logged():
+    """A message can hold a value from the data (a parse error quotes the SQL around it)."""
+    stream = io.StringIO()
+    configure_logging("INFO", stream=stream)
+    try:
+        raise ValueError("Invalid expression near WHERE name = 'Alice Smith' (secret-value-123)")
+    except ValueError:
+        get_logger("x").exception("failed")
+    text = stream.getvalue()
+    assert "secret-value-123" not in text
+    assert "Alice Smith" not in text
+    [record] = _lines(stream)
+    assert record["exc_type"] == "ValueError"
+    assert "test_an_exception_message_is_never_logged" in record["exc"]  # where, not what
+
+
+def test_a_chained_exception_message_is_not_logged_either():
+    stream = io.StringIO()
+    configure_logging("INFO", stream=stream)
+    try:
+        try:
+            raise KeyError("cell-value-456")
+        except KeyError as inner:
+            raise RuntimeError("wrapper") from inner
+    except RuntimeError:
+        get_logger("x").exception("failed")
+    text = stream.getvalue()
+    assert "cell-value-456" not in text
+    [record] = _lines(stream)
+    assert "KeyError" in record["exc"]
+    assert "RuntimeError" in record["exc"]

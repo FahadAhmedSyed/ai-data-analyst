@@ -832,6 +832,28 @@ def test_a_failure_inside_the_validator_refuses_the_query(sales_validator, monke
     )
 
 
+def test_an_internal_error_logs_where_it_happened_and_never_the_sql_or_a_value(
+    sales_validator, monkeypatch
+):
+    """Both ``log.exception`` sites: an exception's message can quote the SQL it was given."""
+    stream = io.StringIO()
+    configure_logging("DEBUG", stream=stream)
+
+    def quoting(*args, **kwargs):
+        raise ValueError("cannot parse: WHERE region = 'secret-value-789'")
+
+    monkeypatch.setattr(validator_module, "qualify", quoting)  # the column check
+    sales_validator.validate("SELECT region FROM sales WHERE region = 'secret-value-789'")
+    monkeypatch.undo()
+    monkeypatch.setattr(sales_validator, "_validate", quoting)  # the whole check
+    sales_validator.validate("SELECT region FROM sales WHERE region = 'secret-value-789'")
+    logged = [json.loads(line) for line in stream.getvalue().splitlines()]
+    errors = [r for r in logged if "exc" in r]
+    assert [r["event"] for r in errors] == ["column_check_failed", "validator_internal_error"]
+    assert all(r["exc_type"] == "ValueError" for r in errors)
+    assert "secret-value-789" not in stream.getvalue()
+
+
 def test_an_unrecognised_column_error_still_goes_back_to_the_corrector(
     sales_validator, monkeypatch
 ):
