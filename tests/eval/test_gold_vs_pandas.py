@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import io
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -111,7 +110,7 @@ ANSWERS = {
     ][["order_id", "order_date", "revenue"]],
     "F06": lambda f: one((f["sales"].customer == "C007").sum()),
     "F07": lambda f: one((f["survey"].sat <= 2).sum()),
-    "F08": lambda f: f["rainfall"].query("site == 'Site A' and mm > 40")[["date", "mm"]],
+    "F08": lambda f: f["rainfall"].query("site == 'Site A' and mm > 40")[["date"]],
     "F09": lambda f: one((f["incidents"].cost > 10000).sum()),
     "G01": lambda f: f["sales"].groupby("region", dropna=False).revenue.sum().reset_index()
     .sort_values("revenue", ascending=False),
@@ -147,7 +146,7 @@ ANSWERS = {
     "M05": lambda f: _days_to_resolve(f["incidents"]).groupby("severity")
     .agg(n=("id", "size"), cost=("cost", "sum"), days=("days", "max")).reset_index(),
     "W04": lambda f: f["sales"].groupby("product").revenue.sum().sort_values(ascending=False)
-    .reset_index().assign(rank=lambda d: np.arange(1, len(d) + 1)),
+    .reset_index(),
     "W06": lambda f: f["finance"].groupby("dept").actual.sum().sort_values(ascending=False)
     .reset_index().assign(share=lambda d: 100 * d.actual / d.actual.sum()),
     "T03": lambda f: f["incidents"].query("severity == 'High'").groupby("site").size()
